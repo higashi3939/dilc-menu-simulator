@@ -1,0 +1,2898 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DILC Menu Simulator v8</title>
+<style>
+:root {
+  --bg:        #0d1117; --surface:  #161b22;
+  --border:    #21262d; --border-hi:#30363d;
+  --text:      #c9d1d9; --text-dim: #484f58; --text-muted:#8b949e;
+  --accent:    #58a6ff;
+  --mode-s:    #58a6ff; --mode-m:   #f0403a;
+  --font-mono:'Courier New',monospace;
+  --font-ui:  'Segoe UI','Helvetica Neue',sans-serif;
+  --scr-w:520px; --scr-h:346px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font-ui);
+  min-height:100vh;display:flex;flex-direction:column;padding:20px;gap:20px}
+
+/* ── Header ── */
+header{display:flex;align-items:center;gap:10px;padding-bottom:14px;
+  border-bottom:1px solid var(--border);flex-wrap:wrap}
+header h1{font-family:var(--font-mono);font-size:13px;color:var(--accent);
+  letter-spacing:.12em;text-transform:uppercase}
+.badge{font-family:var(--font-mono);font-size:10px;padding:2px 6px;
+  border-radius:2px;font-weight:bold}
+.bv{background:var(--accent);color:#000}
+.bf{background:transparent;border:1px solid var(--mode-m);color:var(--mode-m)}
+
+/* lang toggle */
+.lang-toggle{margin-left:auto;display:flex;gap:0;border:1px solid var(--border-hi);
+  border-radius:3px;overflow:hidden}
+.lang-btn{font-family:var(--font-mono);font-size:10px;padding:4px 10px;
+  cursor:pointer;border:none;background:transparent;color:var(--text-muted);
+  transition:all .1s;letter-spacing:.06em}
+.lang-btn.active{background:var(--accent);color:#000;font-weight:bold}
+
+/* ── Layout ── */
+.workspace{display:grid;grid-template-columns:auto 1fr 260px;gap:20px;align-items:start}
+
+/* ── Device col ── */
+.device-col{display:flex;flex-direction:column;align-items:center;gap:10px}
+.col-label{font-family:var(--font-mono);font-size:10px;color:var(--text-dim);
+  letter-spacing:.15em;text-transform:uppercase;align-self:flex-start}
+
+/* Mode switch */
+.mode-sw{width:calc(var(--scr-w) + 20px);display:flex;
+  background:#0d1219;border:1px solid #1e2830;border-radius:5px 5px 0 0;overflow:hidden}
+.mode-btn{flex:1;height:28px;display:flex;align-items:center;justify-content:center;
+  gap:5px;font-family:var(--font-mono);font-size:10px;font-weight:bold;letter-spacing:.08em;
+  cursor:pointer;border:none;background:transparent;color:var(--text-dim);
+  user-select:none;position:relative;transition:color .15s,background .15s}
+.mode-btn.as{color:var(--mode-s);background:rgba(88,166,255,.08)}
+.mode-btn.am{color:var(--mode-m);background:rgba(240,64,58,.08)}
+.mode-btn::after{content:'';position:absolute;bottom:0;left:0;right:0;
+  height:2px;border-radius:1px 1px 0 0;background:transparent;transition:background .15s}
+.mode-btn.as::after{background:var(--mode-s)}
+.mode-btn.am::after{background:var(--mode-m)}
+.mode-div{width:1px;background:#1e2830;flex-shrink:0}
+.rec-dot{width:7px;height:7px;border-radius:50%;background:var(--mode-m);
+  opacity:0;transition:opacity .2s}
+.mode-btn.am .rec-dot{opacity:1;animation:blink 1.2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+
+/* Camera body */
+.cam-body{background:#1a1a1e;border:2px solid #2a2a32;border-top:none;
+  border-radius:0 0 6px 6px;padding:10px 10px 14px;
+  box-shadow:0 4px 24px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.03);
+  width:calc(var(--scr-w) + 20px)}
+
+/* LCD */
+.lcd{width:var(--scr-w);height:var(--scr-h);background:#080c10;
+  border:1px solid #0a0f15;border-radius:2px;overflow:hidden;position:relative;
+  font-family:var(--font-mono);box-shadow:inset 0 0 30px rgba(0,0,0,.8);
+  display:flex;flex-direction:column}
+
+
+/* Tab bar */
+.tab-bar{display:flex;height:34px;background:#060a0d;border-bottom:1px solid #111820;flex-shrink:0}
+.main-tab{flex:1;display:flex;align-items:center;justify-content:center;
+  font-size:0;/* テキスト非表示 */
+  cursor:pointer;position:relative;user-select:none;gap:0;
+  transition:background .12s;}
+.main-tab.act{background:var(--tc,#fff);}
+/* タブアイコン: idle はグレー単色、active はタブカラー背景に白抜き
+   SVG 内では fill="currentColor" で外形を、fill="var(--icon-bg)" で内側のくり抜きを表現 */
+.tab-icon{width:22px;height:22px;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  color:#9097a0;--icon-bg:#060a0d;transition:color .15s;}
+.main-tab.act .tab-icon{color:#fff;--icon-bg:var(--tc,#fff);}
+.tab-icon svg{width:20px;height:20px;}
+
+/* Sub-tab bar */
+.sub-bar{display:flex;flex-direction:column;flex-shrink:0;
+  background:#050810;border-bottom:1px solid #0d1520;}
+.sub-tabs-row{display:flex;align-items:center;justify-content:flex-start;
+  gap:4px;padding:4px 10px 5px;}
+.sub-tab{width:20px;height:8px;border-radius:1px;border:1px solid #1a2530;
+  cursor:pointer;user-select:none;flex-shrink:0;background:transparent}
+.sub-tab.act{border-color:var(--tc,#58a6ff);background:var(--tc,#58a6ff)}
+.sub-info-row{display:flex;align-items:center;justify-content:space-between;
+  padding:0px 10px 4px;}
+.sub-lbl{font-size:11px;color:var(--tc,#58a6ff);letter-spacing:.04em;font-weight:bold;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sub-pgnum{font-size:11px;color:#3a5060;font-family:var(--font-mono);
+  white-space:nowrap;flex-shrink:0;}
+
+/* Items */
+.items-area{flex:1;overflow:hidden;padding:2px 0}
+.mrow{display:flex;align-items:center;height:32px;padding:0 20px 0 20px;
+  cursor:pointer;position:relative;
+  border:1px solid transparent;
+  border-left:10px solid transparent;}
+.mrow.sel{
+  background:rgba(255,255,255,.04);
+  border-top:1px solid var(--tc,#58a6ff);
+  border-bottom:1px solid var(--tc,#58a6ff);
+  border-left:10px solid var(--tc,#58a6ff);
+  border-right:10px solid var(--tc,#58a6ff);}
+.mrow.dis{opacity:.35;pointer-events:none}
+.rl{flex:0 0 50%;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mrow.sel .rl{color:#fff}
+.rv{flex:0 0 50%;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.lcd.mm .rv{color:var(--text)}
+
+/* Status bar */
+.stat-bar{height:26px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 10px;background:#050810;border-top:1px solid #0d1520;
+  font-size:11px;color:#2a3a4a;flex-shrink:0}
+
+/* Dialog */
+.ov{position:absolute;inset:0;background:rgba(4,8,12,.93);z-index:200;
+  display:flex;align-items:center;justify-content:center;padding:16px}
+.dbox{border:1px solid var(--tc,#58a6ff);background:#060e18;padding:14px 16px;
+  width:100%;max-width:380px;border-radius:2px}
+.dtit{font-size:12px;font-weight:bold;color:var(--tc,#58a6ff);
+  border-bottom:1px solid #0d1520;padding-bottom:6px;margin-bottom:10px}
+.dbody{font-size:12px;color:var(--text);margin-bottom:12px;white-space:pre-line;line-height:1.6}
+.dopts{display:flex;flex-direction:column;gap:2px;margin-bottom:12px}
+.dopt{font-size:12px;padding:3px 8px;color:var(--text-muted);cursor:pointer;
+  border-radius:1px;display:flex;align-items:center;gap:8px}
+.dopt.sel{background:rgba(255,255,255,.07);color:#fff}
+.dbullet{color:var(--tc,#58a6ff);font-size:11px}
+.dbtns{display:flex;gap:8px;justify-content:flex-end}
+.dbtn{font-family:var(--font-mono);font-size:11px;padding:3px 12px;
+  border-radius:1px;cursor:pointer;border:1px solid}
+.dbtn.ok{border-color:var(--tc,#58a6ff);color:var(--tc,#58a6ff);background:rgba(88,166,255,.08)}
+.dbtn.ca{border-color:#2a3a4a;color:#3a5060;background:transparent}
+
+/* Control pad */
+.cpad{margin-top:10px;display:grid;
+  grid-template-areas:". up ." "left ok right" "back down .";
+  grid-template-columns:repeat(3,46px);grid-template-rows:repeat(3,32px);
+  gap:4px;justify-content:center}
+.cb{background:#141820;border:1px solid #1e2830;border-radius:4px;
+  color:var(--text-dim);font-size:13px;font-family:var(--font-mono);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  user-select:none;transition:background .08s,color .08s,border-color .08s}
+.cb:hover{background:#1c2530;color:var(--text-muted);border-color:#2a3a4a}
+.cb:active,.cb.fl{background:#58a6ff;color:#000;border-color:#58a6ff}
+.cb[data-k="up"]{grid-area:up}.cb[data-k="left"]{grid-area:left}
+.cb[data-k="enter"]{grid-area:ok;font-size:9px;font-weight:bold;
+  background:#0a1a0a;border-color:#1a4020;color:#40c060}
+.cb[data-k="enter"]:hover{background:#102010}
+.cb[data-k="enter"]:active,.cb[data-k="enter"].fl{background:#40c060;color:#000;border-color:#40c060}
+.cb[data-k="right"]{grid-area:right}.cb[data-k="down"]{grid-area:down}
+.cb[data-k="back"]{grid-area:back;font-size:9px;background:#1a0a0a;border-color:#401a1a;color:#c04040}
+.cb[data-k="back"]:hover{background:#200e0e}
+.cb[data-k="back"]:active,.cb[data-k="back"].fl{background:#c04040;color:#000;border-color:#c04040}
+
+/* Control pad area: cpad + side buttons */
+.cpad-area{margin-top:10px;display:flex;align-items:center;justify-content:center;gap:14px;}
+.cpad-area .cpad{margin-top:0}
+.cpad-side{display:flex;flex-direction:column;gap:6px}
+.ss-btn{background:#141820;border:1px solid #1e2830;border-radius:4px;
+  color:var(--text-dim);font-size:11px;font-family:var(--font-mono);
+  cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  width:54px;height:54px;gap:2px;
+  user-select:none;transition:background .08s,color .08s,border-color .08s}
+.ss-btn:hover{background:#1c2530;color:var(--text-muted);border-color:#2a3a4a}
+.ss-btn:active{background:#58a6ff;color:#000;border-color:#58a6ff}
+.ss-btn .ss-icon{font-size:18px;line-height:1}
+.ss-btn .ss-lbl{font-size:9px;letter-spacing:.04em}
+
+/* Key guide */
+.kguide{font-family:var(--font-mono);font-size:10px;color:var(--text-dim);
+  line-height:1.9;padding:8px 10px;border:1px solid var(--border);
+  border-radius:4px;background:var(--surface);width:100%}
+.kguide kbd{display:inline-block;background:#1c2530;border:1px solid #2a3a4a;
+  border-radius:2px;padding:0 4px;color:var(--accent);font-size:9px;line-height:1.6}
+
+/* Editor */
+.editor-col{display:flex;flex-direction:column;gap:10px}
+.sec-lbl{font-family:var(--font-mono);font-size:10px;color:var(--text-dim);
+  letter-spacing:.15em;text-transform:uppercase;border-bottom:1px solid var(--border);padding-bottom:5px}
+textarea#ed{background:var(--surface);border:1px solid var(--border);border-radius:4px;
+  color:var(--text);font-family:var(--font-mono);font-size:11px;line-height:1.6;
+  padding:10px;resize:vertical;outline:none;min-height:320px;transition:border-color .15s}
+textarea#ed:focus{border-color:var(--accent)}
+textarea#ed.err{border-color:#d04040}
+.errmsg{font-family:var(--font-mono);font-size:10px;color:#d04040;
+  background:rgba(208,64,64,.05);border:1px solid rgba(208,64,64,.2);
+  border-radius:3px;padding:5px 8px;display:none}
+.errmsg.show{display:block}
+.brow{display:flex;gap:6px;flex-wrap:wrap}
+.btn{font-family:var(--font-mono);font-size:10px;padding:5px 12px;border-radius:3px;
+  cursor:pointer;border:1px solid;transition:all .1s;letter-spacing:.04em}
+.bp{background:rgba(88,166,255,.1);border-color:var(--accent);color:var(--accent)}
+.bp:hover{background:rgba(88,166,255,.2)}
+.bs{background:transparent;border-color:var(--border-hi);color:var(--text-muted)}
+.bs:hover{border-color:var(--text-muted);color:var(--text)}
+.bd{background:transparent;border-color:#d04040;color:#d04040}
+.bd:hover{background:rgba(208,64,64,.08)}
+
+/* Log */
+.log-col{display:flex;flex-direction:column;gap:10px}
+.logp{background:var(--surface);border:1px solid var(--border);border-radius:4px;
+  padding:8px;font-family:var(--font-mono);font-size:10px;overflow-y:auto;
+  min-height:180px;max-height:280px}
+.le{display:flex;gap:6px;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.02);line-height:1.5}
+.lts{color:var(--text-dim);flex-shrink:0}
+.la{flex-shrink:0;width:58px}
+.lm{color:var(--text-muted);word-break:break-all}
+.l-nav .la{color:var(--accent)}.l-tab .la{color:#b08000}
+.l-mode .la{color:var(--mode-m)}.l-enter .la{color:#40c060}
+.l-back .la{color:#d04040}.l-set .la{color:#9040c0}
+.l-info .la{color:var(--text-dim)}
+
+.statep{background:var(--surface);border:1px solid var(--border);border-radius:4px;
+  padding:8px;font-family:var(--font-mono);font-size:10px;color:var(--text-muted);line-height:1.8}
+.sr{display:flex;gap:6px}
+.sk{color:var(--text-dim);width:72px;flex-shrink:0}
+.sv{color:var(--text)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>DILC Menu Simulator</h1>
+  <span class="badge bv">v8.0</span>
+  <span class="badge bf">📷/🎬 Stills · Movie</span>
+  <!-- 言語切替 -->
+  <div class="lang-toggle">
+    <button class="lang-btn active" id="btnJa" onclick="setLang('ja')">日本語</button>
+    <button class="lang-btn"        id="btnEn" onclick="setLang('en')">EN</button>
+  </div>
+</header>
+
+<div class="workspace">
+  <!-- Device -->
+  <div class="device-col">
+    <span class="col-label" id="lbl-device">// デバイスプレビュー</span>
+    <div class="mode-sw">
+      <button class="mode-btn as" id="btnStills" onclick="switchMode('stills')">
+        <span>📷</span><span id="lbl-stills">静止画</span>
+      </button>
+      <div class="mode-div"></div>
+      <button class="mode-btn" id="btnMovie" onclick="switchMode('movie')">
+        <span class="rec-dot"></span>
+        <span>🎬</span><span id="lbl-movie">動画</span>
+      </button>
+    </div>
+    <div class="cam-body">
+      <div class="lcd" id="lcd">
+        <div class="tab-bar"   id="tabBar"></div>
+        <div class="sub-bar"   id="subBar"></div>
+        <div class="items-area" id="itemsArea"></div>
+        <div class="stat-bar">
+          <span id="hintL">SET:変更  MENU:戻る</span>
+          <span id="hintR">↑↓:移動  ←→:タブ</span>
+        </div>
+      </div>
+      <div class="cpad-area">
+        <div class="cpad">
+          <button class="cb" data-k="up">▲</button>
+          <button class="cb" data-k="left">◀</button>
+          <button class="cb" data-k="enter">SET</button>
+          <button class="cb" data-k="right">▶</button>
+          <button class="cb" data-k="down">▼</button>
+          <button class="cb" data-k="back">MENU</button>
+        </div>
+        <div class="cpad-side">
+          <button class="ss-btn" id="btnScreenshot" onclick="takeScreenshot()" title="液晶画面をPNGで保存">
+            <span class="ss-icon">📸</span>
+            <span class="ss-lbl" id="lbl-screenshot">保存</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="kguide" id="kguide">
+      <kbd>←</kbd><kbd>→</kbd> タブ切替 &nbsp;<kbd>↑</kbd><kbd>↓</kbd> 項目移動<br>
+      <kbd>Enter</kbd> 値変更（SET）&nbsp;<kbd>Esc</kbd> 戻る（MENU）<br>
+      <kbd>M</kbd> 静止画/動画 切替 &nbsp;<kbd>L</kbd> 言語切替
+    </div>
+  </div>
+
+  <!-- Editor -->
+  <div class="editor-col">
+    <span class="sec-lbl" id="lbl-editor">// メニュー定義 (JSON)</span>
+    <textarea id="ed" spellcheck="false"></textarea>
+    <div class="errmsg" id="errmsg"></div>
+    <div class="brow">
+      <button class="btn bp" onclick="applyJson()" id="btn-apply">▶ 適用</button>
+      <button class="btn bs" onclick="resetSim()"  id="btn-reset">↺ リセット</button>
+      <button class="btn bs" onclick="loadSample()" id="btn-sample">サンプル読込</button>
+      <button class="btn bd" onclick="clearLog()"  id="btn-clear">ログ消去</button>
+    </div>
+  </div>
+
+  <!-- Log -->
+  <div class="log-col">
+    <span class="sec-lbl" id="lbl-log">// ナビゲーションログ</span>
+    <div class="logp" id="logp"></div>
+    <span class="sec-lbl" id="lbl-state">// 現在の状態</span>
+    <div class="statep" id="statep"></div>
+  </div>
+</div>
+
+<script>
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  SECTION 1: CONSTANTS & DATA                                  ║
+   ║  UI多言語ラベル / SAMPLEメニューデータ（静止画・動画）                            ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+
+'use strict';
+
+/* ── 多言語ラベル定義 ── */
+const UI = {
+  ja:{
+    device:'// デバイスプレビュー', stills:'静止画', movie:'動画',
+    editor:'// メニュー定義 (JSON)', log:'// ナビゲーションログ', state:'// 現在の状態',
+    apply:'▶ 適用', reset:'↺ リセット', sample:'サンプル読込', clear:'ログ消去',
+    hintL:'SET:変更  MENU:戻る', hintR:'↑↓:移動  ←→:タブ',
+    kguide:'<kbd>←</kbd><kbd>→</kbd> タブ切替 &nbsp;<kbd>↑</kbd><kbd>↓</kbd> 項目移動<br><kbd>Enter</kbd> 値変更（SET）&nbsp;<kbd>Esc</kbd> 戻る（MENU）<br><kbd>M</kbd> 静止画/動画 切替 &nbsp;<kbd>L</kbd> 言語切替',
+    mode_stills:'静止画モードに切替', mode_movie:'動画モードに切替', reset_msg:'シミュレーターをリセット',
+    load_ok:'メニュー定義を更新', close:'ダイアログを閉じる',
+    action_note:'（アクション実行ポイント）\nここに実装を追加できます',
+    screenshot:'保存', screenshot_ok:'PNGを保存', screenshot_err:'スクリーンショット失敗',
+  },
+  en:{
+    device:'// Device Preview', stills:'Stills', movie:'Movie',
+    editor:'// Menu Definition (JSON)', log:'// Navigation Log', state:'// Current State',
+    apply:'▶ Apply', reset:'↺ Reset', sample:'Load Sample', clear:'Clear Log',
+    hintL:'SET:Change  MENU:Back', hintR:'↑↓:Move  ←→:Tab',
+    kguide:'<kbd>←</kbd><kbd>→</kbd> Tab &nbsp;<kbd>↑</kbd><kbd>↓</kbd> Move<br><kbd>Enter</kbd> Change（SET）&nbsp;<kbd>Esc</kbd> Back（MENU）<br><kbd>M</kbd> Stills/Movie &nbsp;<kbd>L</kbd> Language',
+    mode_stills:'Switched to Stills', mode_movie:'Switched to Movie', reset_msg:'Simulator reset',
+    load_ok:'Menu definition updated', close:'Dialog closed',
+    action_note:'(Action point)\nAdd implementation here.',
+    screenshot:'Save', screenshot_ok:'PNG saved', screenshot_err:'Screenshot failed',
+  }
+};
+
+/* ── EOS R5 Mark II メニュー定義 / 出典: cam.start.canon 公式マニュアル / 各項目: { id, ja, en, type, value, options:{ja:[],en:[]} or string } ── */
+const SAMPLE = {
+
+/* ────────── 静止画モード ────────── */
+stills:{ tabs:[
+  {
+    id:'shoot', ja:'撮影', en:'Shoot', color:'#d04040',
+    pages:[
+      { page:1, ja:'画質/サイズ', en:'Image quality/size', items:[
+        { id:'s1_1', ja:'JPEG/HEIF画質',    en:'JPEG/HEIF quality',   type:'select', value:'ファイン/Fine',
+          options:{ ja:['ラージファイン','ファイン','ノーマル'], en:['Large fine','Fine','Normal'] }},
+        { id:'s1_2', ja:'画像タイプ/サイズ', en:'Img type/size',        type:'select', value:'RAW',
+          options:{ ja:['RAW','CRAW','RAW+L','RAW+M','RAW+S1','L','M','S1','S2'], en:['RAW','CRAW','RAW+L','RAW+M','RAW+S1','L','M','S1','S2'] }},
+        { id:'s1_3', ja:'トリミング/アスペクト比', en:'Cropping/aspect ratio', type:'select', value:'フルサイズ/Full-frame',
+          options:{ ja:['フルサイズ','1.6x(クロップ)','1:1','4:3','16:9'], en:['Full-frame','1.6x(crop)','1:1','4:3','16:9'] }},
+      ]},
+      { page:2, ja:'露出', en:'Exposure', items:[
+        { id:'s2_1', ja:'露出補正/AEB',      en:'Expo.comp./AEB',         type:'display', value:'0' },
+        { id:'s2_2', ja:'ISO感度設定',        en:'ISO speed settings',     type:'action',  value:'→' },
+        { id:'s2_3', ja:'フリッカーレス撮影', en:'Anti-flicker shoot.',    type:'select',  value:'しない/Disable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+        { id:'s2_4', ja:'高周波フリッカーレス撮影', en:'HF anti-flicker shooting', type:'select', value:'しない/Disable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+        { id:'s2_5', ja:'外部スピードライト制御', en:'External Speedlite control', type:'action', value:'→' },
+        { id:'s2_6', ja:'測光モード',          en:'Metering mode',          type:'select',  value:'評価測光/Evaluative',
+          options:{ ja:['評価測光','部分測光','スポット測光','中央部重点平均測光'], en:['Evaluative','Partial','Spot','Center-weighted avg.'] }},
+        { id:'s2_7', ja:'AF中の自動露出優先', en:'Detect priority AE while AF', type:'select', value:'しない/Disable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+      ]},
+      { page:3, ja:'色調/ダイナミックレンジ', en:'Color/tone/Dynamic range', items:[
+        { id:'s3_1', ja:'ピクチャースタイル',        en:'Picture Style',            type:'select', value:'スタンダード/Standard',
+          options:{ ja:['オート','スタンダード','ポートレート','風景','ディテール重視','ニュートラル','忠実設定','モノクロ','ユーザー設定1'], en:['Auto','Standard','Portrait','Landscape','Fine Detail','Neutral','Faithful','Monochrome','User Def. 1'] }},
+        { id:'s3_2', ja:'色空間',                   en:'Color space',              type:'select', value:'sRGB',
+          options:{ ja:['sRGB','Adobe RGB'], en:['sRGB','Adobe RGB'] }},
+        { id:'s3_3', ja:'クラリティ',               en:'Clarity',                  type:'select', value:'0',
+          options:{ ja:['-4','-3','-2','-1','0','+1','+2','+3','+4'], en:['-4','-3','-2','-1','0','+1','+2','+3','+4'] }},
+        { id:'s3_4', ja:'HDR撮影（PQ）',            en:'HDR shooting (PQ)',        type:'select', value:'しない/Disable HDR',
+          options:{ ja:['しない','HDR撮影する'], en:['Disable HDR','Enable HDR'] }},
+        { id:'s3_5', ja:'自動輝度最適化',            en:'Auto Lighting Optimizer',  type:'select', value:'標準/Standard',
+          options:{ ja:['しない','弱め','標準','強め'], en:['Disable','Low','Standard','High'] }},
+        { id:'s3_6', ja:'ハイライト優先',            en:'Highlight tone priority',  type:'select', value:'しない/Disable',
+          options:{ ja:['しない','する','強め'], en:['Disable','Enable','Enhanced'] }},
+      ]},
+      { page:4, ja:'ホワイトバランス/画質補正', en:'White balance/Quality correction', items:[
+        { id:'s4_1', ja:'ホワイトバランス',          en:'White balance',            type:'select', value:'AWB（白を優先）/AWB White Priority',
+          options:{ ja:['AWB（白を優先）','AWB（雰囲気を優先）','太陽光','日陰','くもり','白熱電球','白色蛍光灯','ストロボ','カスタム','色温度'], en:['AWB (White Priority)','AWB (Ambience Priority)','Daylight','Shade','Cloudy','Tungsten','White fluorescent','Flash','Custom','Color temp.'] }},
+        { id:'s4_2', ja:'カスタムホワイトバランス',  en:'Set Custom WB',            type:'action', value:'→' },
+        { id:'s4_3', ja:'WBシフト/ブラケティング',   en:'WB Shift/Bkt.',            type:'display',value:'0, 0' },
+        { id:'s4_4', ja:'レンズ光学補正',            en:'Lens aberration correction', type:'action', value:'→' },
+        { id:'s4_5', ja:'長秒時ノイズ低減',          en:'Long exp. noise reduction', type:'select', value:'しない/Off',
+          options:{ ja:['しない','自動','する'], en:['Off','Auto','On'] }},
+        { id:'s4_6', ja:'高感度撮影時のノイズ低減', en:'High ISO speed NR',         type:'select', value:'標準/Standard',
+          options:{ ja:['マルチショット','強め','標準','弱め','しない'], en:['Multi Shot','High','Standard','Low','Disable'] }},
+        { id:'s4_7', ja:'ゴミ消し情報',              en:'Dust Delete Data',          type:'action', value:'→' },
+      ]},
+      { page:5, ja:'各種撮影機能', en:'Various shooting', items:[
+        { id:'s5_1', ja:'多重露出',            en:'Multiple exposure',   type:'action', value:'→' },
+        { id:'s5_2', ja:'フォーカスBKT撮影', en:'Focus bracketing',     type:'action', value:'→' },
+      ]},
+      { page:6, ja:'シャッター制御', en:'Shutter control', items:[
+        { id:'s6_1', ja:'ドライブモード',          en:'Drive mode',                   type:'select', value:'1枚撮影/Single shooting',
+          options:{ ja:['1枚撮影','高速連続撮影+','高速連続撮影','低速連続撮影','セルフタイマー:10秒','セルフタイマー:2秒','セルフタイマー:連続撮影'], en:['Single shooting','High speed+','High speed','Low speed','Self-timer: 10sec','Self-timer: 2sec','Self-timer: Continuous'] }},
+        { id:'s6_2', ja:'プリ連続撮影',            en:'Pre-cont. shooting',            type:'select', value:'しない/Off',
+          options:{ ja:['しない','0.5秒前','1秒前','1.5秒前','2秒前','2.5秒前','3秒前'], en:['Off','0.5 sec','1 sec','1.5 sec','2 sec','2.5 sec','3 sec'] }},
+        { id:'s6_3', ja:'インターバルタイマー撮影', en:'Interval timer',               type:'select', value:'しない/Disable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+        { id:'s6_4', ja:'バルブタイマー',           en:'Bulb timer',                   type:'select', value:'しない/Disable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+        { id:'s6_5', ja:'サイレントシャッター機能', en:'Silent shutter function',      type:'action', value:'→' },
+        { id:'s6_6', ja:'シャッター方式',            en:'Shutter mode',                 type:'select', value:'電子先幕/Elec. 1st-curtain',
+          options:{ ja:['メカシャッター','電子先幕','電子シャッター'], en:['Mechanical','Elec. 1st-curtain','Electronic'] }},
+        { id:'s6_7', ja:'カード無しレリーズ',        en:'Release shutter without card', type:'select', value:'する/Enable',
+          options:{ ja:['する','しない'], en:['Enable','Disable'] }},
+      ]},
+      { page:7, ja:'撮影アシスト', en:'Assist shooting', items:[
+        { id:'s7_1', ja:'手ブレ補正(IS)モード', en:'IS (Image Stabilizer) mode', type:'select', value:'入/On',
+          options:{ ja:['切','入'], en:['Off','On'] }},
+        { id:'s7_2', ja:'クイックコントロールカスタマイズ', en:'Customize Quick Controls', type:'action', value:'→' },
+        { id:'s7_3', ja:'測光タイマー', en:'Metering timer', type:'select', value:'8秒/8 sec.',
+          options:{ ja:['4秒','8秒','16秒','30秒','1分','10分','30分'], en:['4 sec.','8 sec.','16 sec.','30 sec.','1 min.','10 min.','30 min.'] }},
+      ]},
+      { page:8, ja:'撮影アシスト（表示）', en:'Assist shooting (display)', items:[
+        { id:'s8_1', ja:'撮影直後の画像確認',        en:'Image review',           type:'action', value:'→' },
+        { id:'s8_2', ja:'高速表示',                  en:'High speed display',     type:'select', value:'しない/Off',
+          options:{ ja:['しない','する'], en:['Off','On'] }},
+        { id:'s8_3', ja:'ブラックアウトフリー表示',  en:'Blackout-free display',  type:'select', value:'しない/Off',
+          options:{ ja:['しない','する'], en:['Off','On'] }},
+        { id:'s8_4', ja:'表示シミュレーション',      en:'Display simulation',     type:'select', value:'露出/ホワイトバランス/Exposure/WB',
+          options:{ ja:['しない','露出のみ','露出/ホワイトバランス'], en:['Off','Exposure','Exposure/WB'] }},
+        { id:'s8_5', ja:'OVFビューアシスト',         en:'OVF sim. view assist',   type:'select', value:'しない/Off',
+          options:{ ja:['しない','プリセットA','プリセットB','カスタム'], en:['Off','Preset A','Preset B','Custom'] }},
+        { id:'s8_6', ja:'HDR/ClogViewアシスト',     en:'HDR/C.Log View Assist.', type:'select', value:'しない/Off',
+          options:{ ja:['しない','する'], en:['Off','On'] }},
+      ]},
+      { page:9, ja:'撮影情報表示', en:'Assist shooting (info)', items:[
+        { id:'s9_1', ja:'撮影情報表示設定',   en:'Shooting info. disp.',     type:'action', value:'→' },
+        { id:'s9_2', ja:'表示フレームレート設定', en:'Display frame rate set.', type:'select', value:'120fps',
+          options:{ ja:['60fps','120fps'], en:['60fps','120fps'] }},
+        { id:'s9_3', ja:'ファインダー表示形式', en:'VF display format',       type:'select', value:'表示1/Show 1',
+          options:{ ja:['表示1','表示2','表示3'], en:['Show 1','Show 2','Show 3'] }},
+        { id:'s9_4', ja:'反転表示',            en:'Reverse display',         type:'select', value:'しない/Off',
+          options:{ ja:['しない','する'], en:['Off','On'] }},
+        { id:'s9_5', ja:'高温時自動電源オフ温度', en:'Auto pwr off temp.',    type:'select', value:'標準/Standard',
+          options:{ ja:['標準','高め'], en:['Standard','High'] }},
+      ]},
+    ]
+  },
+  {
+    id:'af', ja:'AF', en:'AF', color:'#9040c0',
+    pages:[
+      { page:1, ja:'AF動作/エリア', en:'AF operation/area', items:[
+        { id:'af1_1', ja:'AF動作', en:'AF operation', type:'select', value:'ワンショットAF/One-Shot AF',
+          options:{ ja:['ワンショットAF','サーボAF'], en:['One-Shot AF','Servo AF'] }},
+        { id:'af1_2', ja:'AFエリア', en:'AF area', type:'select', value:'全域AF/Whole area AF',
+          options:{ ja:['スポット1点AF','1点AF','領域拡大AF（手動選択:☩）','領域拡大AF（手動選択:周囲）','ゾーンAF（手動選択：ゾーン）','ラージゾーンAF:縦（手動選択）','ラージゾーンAF:横（手動選択）','フレキシブルゾーンAF1','フレキシブルゾーンAF2','フレキシブルゾーンAF3','全域AF'], en:['Spot AF','1-point AF','Expand AF area: ☩','Expand AF area: Around','Zone AF (man. select: zone)','Large zone AF: V','Large zone AF: H','Flexible zone AF 1','Flexible zone AF 2','Flexible zone AF 3','Whole area AF'] }},
+        { id:'af1_3', ja:'全域AFサーボAF', en:'Whole area tracking Servo AF', type:'select', value:'する/Enable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+        { id:'af1_4', ja:'フォーカスモード', en:'Focus mode', type:'select', value:'AF',
+          options:{ ja:['AF','MF'], en:['AF','MF'] }},
+      ]},
+      { page:2, ja:'被写体検出', en:'Subject detection', items:[
+        { id:'af2_1', ja:'検出する被写体', en:'Subject to detect', type:'select', value:'自動/Auto',
+          options:{ ja:['なし（優先しない）','人物','動物（鳥含む）','乗り物','自動'], en:['No priority','People','Animals','Vehicles','Auto'] }},
+        { id:'af2_2', ja:'瞳検出', en:'Eye detection', type:'select', value:'する/Enable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+        { id:'af2_3', ja:'人物優先登録', en:'Register people priority', type:'action', value:'→' },
+        { id:'af2_4', ja:'アクション優先', en:'Action Priority', type:'select', value:'しない/Disable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+      ]},
+      { page:3, ja:'サーボAF特性', en:'Servo AF character.', items:[
+        { id:'af3_1', ja:'ケース自動', en:'Case Auto', type:'select', value:'入/On',
+          options:{ ja:['切','入'], en:['Off','On'] }},
+        { id:'af3_2', ja:'ケース自動:特性調整', en:'Case Auto character.', type:'action', value:'→' },
+        { id:'af3_3', ja:'ケース手動調整', en:'Case Manual', type:'action', value:'→' },
+        { id:'af3_4', ja:'トラッキング感度', en:'Tracking sensitivity', type:'select', value:'0',
+          options:{ ja:['-2','-1','0','+1','+2'], en:['-2','-1','0','+1','+2'] }},
+        { id:'af3_5', ja:'加減速度トラッキング', en:'Accel./decel. tracking', type:'select', value:'0',
+          options:{ ja:['0','1','2'], en:['0','1','2'] }},
+        { id:'af3_6', ja:'ケースSP', en:'Case Special', type:'action', value:'→' },
+      ]},
+      { page:4, ja:'AF動作カスタマイズ', en:'Customize AF operation', items:[
+        { id:'af4_1', ja:'サーボAF 1枚目の優先', en:'Servo 1st image priority', type:'select', value:'同等優先/Equal priority',
+          options:{ ja:['同等優先','レリーズ優先','フォーカス優先'], en:['Equal priority','Release priority','Focus priority'] }},
+        { id:'af4_2', ja:'ワンショットAFのレリーズ優先', en:'One-Shot AF release prior.', type:'select', value:'フォーカス優先/Focus priority',
+          options:{ ja:['フォーカス優先','レリーズ優先'], en:['Focus priority','Release priority'] }},
+        { id:'af4_3', ja:'プレビューAF', en:'Preview AF', type:'select', value:'する/Enable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+        { id:'af4_4', ja:'AF不能時のレンズ駆動', en:'Lens drive when AF impossible', type:'select', value:'フォーカスサーチする/Focus search on',
+          options:{ ja:['フォーカスサーチする','フォーカスサーチしない'], en:['Focus search on','Focus search off'] }},
+        { id:'af4_5', ja:'AF補助光の発光', en:'AF-assist beam firing', type:'select', value:'する/Enable',
+          options:{ ja:['する','しない','外部ストロボのみ発光'], en:['Enable','Disable','Only ext. flash emits'] }},
+      ]},
+      { page:5, ja:'カスタマイズ制御', en:'Customized controls', items:[
+        { id:'af5_1', ja:'AF動作の制限', en:'Limit AF areas', type:'action', value:'→' },
+        { id:'af5_2', ja:'縦位置AF点と横位置AF点の切り換え', en:'Orientation linked AF point', type:'select', value:'縦横同じ/Same for both',
+          options:{ ja:['縦横同じ','エリア+点を別々に','点のみ別々に'], en:['Same for both','Separate: Area+pt','Separate: Pt only'] }},
+        { id:'af5_3', ja:'検出する被写体の制限', en:'Limit subject to detect', type:'action', value:'→' },
+        { id:'af5_4', ja:'左右の瞳を選択', en:'L/R eye detection', type:'select', value:'自動/Auto',
+          options:{ ja:['自動','左目優先','右目優先'], en:['Auto','Left eye priority','Right eye priority'] }},
+      ]},
+      { page:6, ja:'MF関連', en:'MF related', items:[
+        { id:'af6_1', ja:'MFピーキング設定', en:'MF peaking settings', type:'action', value:'→' },
+        { id:'af6_2', ja:'フォーカスガイド', en:'Focus guide', type:'select', value:'しない/Disable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+        { id:'af6_3', ja:'レンズの電子MF', en:'Lens electronic MF', type:'select', value:'ワンショットAF後に有効/Enable after One-Shot',
+          options:{ ja:['しない','ワンショットAF後に有効','常時有効'], en:['Disable','Enable after One-Shot','Always enable'] }},
+      ]},
+      { page:7, ja:'各種設定', en:'Various settings', items:[
+        { id:'af7_1', ja:'AF関連設定の登録/呼び出し', en:'Register/recall AF-related settings', type:'action', value:'→' },
+        { id:'af7_2', ja:'AF設定ガイドURL', en:'AF Setting Guide URL', type:'display', value:'cam.start.canon' },
+      ]},
+    ]
+  },
+  {
+    id:'play', ja:'再生', en:'Playback', color:'#2060c8',
+    pages:[
+      { page:1, ja:'ファイル操作', en:'File operation', items:[
+        { id:'p1_1', ja:'画像を保護する', en:'Protect images',          type:'action', value:'→' },
+        { id:'p1_2', ja:'画像を消去する', en:'Erase images',            type:'action', value:'→' },
+        { id:'p1_3', ja:'静止画を回転する', en:'Rotate stills',         type:'action', value:'→' },
+        { id:'p1_4', ja:'動画の向き情報を変更', en:'Change mov rotate info', type:'action', value:'→' },
+        { id:'p1_5', ja:'レーティング',   en:'Rating',                  type:'action', value:'→' },
+        { id:'p1_6', ja:'レーティング設定時に保護', en:'Protect when setting the rating', type:'select', value:'しない/Off',
+          options:{ ja:['しない','する'], en:['Off','On'] }},
+      ]},
+      { page:2, ja:'ファイル操作2', en:'File operation 2', items:[
+        { id:'p2_1', ja:'画像をコピーする', en:'Image copy',  type:'action', value:'→' },
+        { id:'p2_2', ja:'プリント指定（DPOF）', en:'Print order', type:'action', value:'→' },
+      ]},
+      { page:3, ja:'画像処理', en:'Image processing', items:[
+        { id:'p3_1', ja:'RAW現像',              en:'RAW image processing',      type:'action', value:'→' },
+        { id:'p3_2', ja:'カメラ内アップスケーリング', en:'In-Camera Upscaling', type:'action', value:'→' },
+        { id:'p3_3', ja:'リサイズ',             en:'Resize',                    type:'action', value:'→' },
+        { id:'p3_4', ja:'トリミング',           en:'Cropping',                  type:'action', value:'→' },
+        { id:'p3_5', ja:'HEIF→JPEG変換',       en:'HEIF→JPEG conversion',      type:'action', value:'→' },
+      ]},
+      { page:4, ja:'再生方法', en:'Playback method', items:[
+        { id:'p4_1', ja:'スライドショー',       en:'Slide show',               type:'action', value:'→' },
+        { id:'p4_2', ja:'VRプレビュー',         en:'VR preview',               type:'action', value:'→' },
+        { id:'p4_3', ja:'画像検索条件の設定',   en:'Set image search conditions', type:'action', value:'→' },
+        { id:'p4_4', ja:'前回の続きから再生',   en:'View from last seen',      type:'select', value:'しない/Off',
+          options:{ ja:['しない','する'], en:['Off','On'] }},
+        { id:'p4_5', ja:'拡大率（初期値）',     en:'Magnification',            type:'action', value:'→' },
+        { id:'p4_6', ja:'ボケ/ピンぼけ画像の検出', en:'Blur/Out-of-Focus image detection', type:'action', value:'→' },
+      ]},
+      { page:5, ja:'各種設定', en:'Various settings', items:[
+        { id:'p5_1', ja:'再生情報表示',         en:'Playback information display', type:'action', value:'→' },
+        { id:'p5_2', ja:'ハイライト警告',       en:'Highlight alert',          type:'select', value:'しない/Disable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+        { id:'p5_3', ja:'AF点の表示',           en:'AF point disp.',           type:'select', value:'する/Enable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+        { id:'p5_4', ja:'再生グリッド',         en:'Playback grid',            type:'select', value:'表示しない/Off',
+          options:{ ja:['表示しない','3×3','6×4','3×3+対角'], en:['Off','3x3','6x4','3x3+diag'] }},
+        { id:'p5_5', ja:'動画再生カウント',     en:'Movie play count',         type:'select', value:'再生時間/Playback time',
+          options:{ ja:['再生時間','残り時間'], en:['Playback time','Time remaining'] }},
+        { id:'p5_6', ja:'メモ音声画質',         en:'Memo audio quality',       type:'select', value:'ファイン/Fine',
+          options:{ ja:['ファイン','ノーマル'], en:['Fine','Normal'] }},
+      ]},
+    ]
+  },
+  {
+    id:'comm', ja:'通信機能', en:'Communication', color:'#7030b0',
+    pages:[
+      { page:1, ja:'ネットワーク設定', en:'Network settings', items:[
+        { id:'c1_1', ja:'ネットワーク設定',     en:'Network settings',         type:'action', value:'→' },
+        { id:'c1_2', ja:'機内モード',           en:'Airplane mode',            type:'select', value:'切/Off',
+          options:{ ja:['切','入'], en:['Off','On'] }},
+        { id:'c1_3', ja:'Bluetooth設定',        en:'Bluetooth settings',       type:'action', value:'→' },
+        { id:'c1_4', ja:'カメラのニックネーム', en:'Camera name',              type:'display', value:'EOS R5 Mark II' },
+        { id:'c1_5', ja:'MACアドレス',          en:'MAC address',              type:'display', value:'──:──:──:──:──:──' },
+      ]},
+      { page:2, ja:'ネットワーク機能', en:'Network function', items:[
+        { id:'c2_1', ja:'FTPサーバーに転送',        en:'Transfer images to FTP server', type:'action', value:'→' },
+        { id:'c2_2', ja:'EOS Utilityと接続する',    en:'Connect to EOS Utility',        type:'action', value:'→' },
+      ]},
+    ]
+  },
+  {
+    id:'setup', ja:'セットアップ', en:'Set-up', color:'#b08000',
+    pages:[
+      { page:1, ja:'ファイル/カード設定', en:'File/card setting', items:[
+        { id:'t1_1', ja:'記録機能+カード・フォルダー選択', en:'Record func+card/folder sel.', type:'action', value:'→' },
+        { id:'t1_2', ja:'ファイル番号',             en:'File numbering',           type:'select', value:'通し番号/Continuous',
+          options:{ ja:['通し番号','自動リセット','手動リセット'], en:['Continuous','Auto reset','Manual reset'] }},
+        { id:'t1_3', ja:'クリップ番号',             en:'Clip Number',              type:'select', value:'通し番号/Continuous',
+          options:{ ja:['通し番号','自動リセット'], en:['Continuous','Auto reset'] }},
+        { id:'t1_4', ja:'ファイル名',               en:'File name',                type:'display', value:'IMG_' },
+        { id:'t1_5', ja:'カードの初期化',           en:'Format card',              type:'action', value:'→ 実行/Execute' },
+        { id:'t1_6', ja:'画像回転情報付加',         en:'Auto rotate',              type:'select', value:'入（カメラ＋パソコン）/On (camera/computer)',
+          options:{ ja:['入（カメラ＋パソコン）','入（パソコンのみ）','切'], en:['On (camera/computer)','On (computer only)','Off'] }},
+        { id:'t1_7', ja:'動画に向き情報を付加',     en:'Add movie rotate info',    type:'select', value:'する/Enable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+      ]},
+      { page:2, ja:'地域/ガイダンス/音声設定', en:'Country/Area/Guidance/Audio', items:[
+        { id:'t2_1', ja:'日付/時刻/エリア',         en:'Date/Time/Zone',           type:'action', value:'→' },
+        { id:'t2_2', ja:'言語',                     en:'Language',                 type:'select', value:'日本語',
+          options:{ ja:['日本語','English','Deutsch','Français','한국어','简体中文','繁體中文'], en:['日本語','English','Deutsch','Français','한국어','简体中文','繁體中文'] }},
+        { id:'t2_3', ja:'映像方式',                 en:'System frequency',         type:'select', value:'59.94Hz',
+          options:{ ja:['59.94Hz','50.00Hz'], en:['59.94 Hz','50.00 Hz'] }},
+        { id:'t2_4', ja:'ヘルプテキストのサイズ',   en:'Help text size',           type:'select', value:'小/Small',
+          options:{ ja:['小','大'], en:['Small','Large'] }},
+        { id:'t2_5', ja:'ビープ音',                 en:'Beep',                     type:'select', value:'入/Enable',
+          options:{ ja:['切','小さく鳴らす','入'], en:['Disable','Enable (low volume)','Enable'] }},
+        { id:'t2_6', ja:'音量',                     en:'Volume',                   type:'select', value:'5',
+          options:{ ja:['0','1','2','3','4','5','6','7','8'], en:['0','1','2','3','4','5','6','7','8'] }},
+        { id:'t2_7', ja:'音声モニター',             en:'Audio monitor',            type:'action', value:'→' },
+      ]},
+      { page:3, ja:'表示カスタマイズ', en:'Customize display', items:[
+        { id:'t3_1', ja:'モニターの明るさ',         en:'Screen brightness',        type:'select', value:'4',
+          options:{ ja:['1','2','3','4','5','6','7'], en:['1','2','3','4','5','6','7'] }},
+        { id:'t3_2', ja:'ファインダーの明るさ',     en:'Viewfinder brightness',    type:'select', value:'自動/Auto',
+          options:{ ja:['手動','自動'], en:['Manual','Auto'] }},
+        { id:'t3_3', ja:'モニター/ファインダーのカラーバランス', en:'Screen/viewfinder color tone', type:'action', value:'→' },
+        { id:'t3_4', ja:'ファインダーのカラーバランス微調整', en:'Fine-tune VF color tone', type:'action', value:'→' },
+        { id:'t3_5', ja:'モニター/ファインダーの切り換え制御', en:'Screen/viewfinder display', type:'select', value:'自動切り換え/Auto',
+          options:{ ja:['自動切り換え','モニター固定','ファインダー固定'], en:['Auto','Screen','Viewfinder'] }},
+        { id:'t3_6', ja:'UI拡大表示',               en:'UI magnification',         type:'select', value:'しない/Standard',
+          options:{ ja:['しない','する'], en:['Standard','Large'] }},
+        { id:'t3_7', ja:'HDMI解像度',               en:'HDMI resolution',          type:'select', value:'自動/Auto',
+          options:{ ja:['自動','1080p','4K'], en:['Auto','1080p','4K'] }},
+      ]},
+      { page:4, ja:'各種設定', en:'Various settings', items:[
+        { id:'t4_1', ja:'冷却ファン設定',           en:'Cooling fan settings',     type:'action', value:'→' },
+        { id:'t4_2', ja:'電源オフ時のシャッター', en:'Shutter at shutdown',        type:'select', value:'閉じる/Close',
+          options:{ ja:['閉じる','開けておく'], en:['Close','Keep open'] }},
+        { id:'t4_3', ja:'センサークリーニング',     en:'Sensor cleaning',          type:'action', value:'→' },
+        { id:'t4_4', ja:'パスワード管理',           en:'Manage password',          type:'action', value:'→' },
+        { id:'t4_5', ja:'節電設定',                 en:'Power saving',             type:'action', value:'→' },
+      ]},
+      { page:5, ja:'リセット/全設定', en:'Reset/All settings', items:[
+        { id:'t5_1', ja:'カメラの初期化',           en:'Reset camera',             type:'action', value:'→' },
+        { id:'t5_2', ja:'カスタム撮影モード(C1-C3)', en:'Custom shooting mode (C1-C3)', type:'action', value:'→' },
+        { id:'t5_3', ja:'カメラの設定をカードに記録/読み込み', en:'Save/load cam settings on card', type:'action', value:'→' },
+      ]},
+      { page:6, ja:'各種設定（情報）', en:'Various settings (info)', items:[
+        { id:'t6_1', ja:'バッテリー情報',           en:'Battery info.',            type:'display', value:'100% LP-E6NH' },
+        { id:'t6_2', ja:'著作権情報の設定',         en:'Copyright information',    type:'action', value:'→' },
+        { id:'t6_3', ja:'ログの表示',               en:'Show log',                 type:'action', value:'→' },
+        { id:'t6_4', ja:'マニュアル/ソフトウェアURL', en:'Manual/software URL',    type:'display', value:'cam.start.canon' },
+        { id:'t6_5', ja:'認証マークを表示する',     en:'Certification Logo Display', type:'action', value:'→' },
+        { id:'t6_6', ja:'ファームウェア',           en:'Firmware',                 type:'display', value:'Ver. 1.0.0' },
+      ]},
+    ]
+  },
+  {
+    id:'ctrl', ja:'カスタマイズ制御', en:'Ctrl customization', color:'#d07020',
+    pages:[
+      { page:1, ja:'カスタマイズ制御（静止画）', en:'Customized controls (stills)', items:[
+        { id:'cc1_1', ja:'撮影時のカスタマイズ（ボタン）', en:'Customize buttons for shooting', type:'action', value:'→' },
+        { id:'cc1_2', ja:'撮影時のカスタマイズ（ダイヤル/リング）', en:'Customize dials/control ring', type:'action', value:'→' },
+        { id:'cc1_3', ja:'Tv/Avの設定方向',        en:'Direction to set Tv/Av',   type:'select', value:'通常方向/Normal',
+          options:{ ja:['通常方向','反転'], en:['Normal','Reverse direction'] }},
+        { id:'cc1_4', ja:'撮影時の☆と☆☆の切り換え', en:'Switch dials when shooting', type:'action', value:'→' },
+        { id:'cc1_5', ja:'タッチシャッター',        en:'Touch Shutter',            type:'select', value:'しない/Disable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+        { id:'cc1_6', ja:'マルチファンクションロック', en:'Multi function lock',   type:'action', value:'→' },
+      ]},
+      { page:2, ja:'カスタマイズ制御（AF）', en:'Customized controls (AF)', items:[
+        { id:'cc2_1', ja:'タッチ&ドラッグAF設定',  en:'Touch & drag AF settings', type:'action', value:'→' },
+        { id:'cc2_2', ja:'AFエリア選択操作',        en:'AF area selection control', type:'action', value:'→' },
+        { id:'cc2_3', ja:'AFエリアの移動感度',      en:'Sensitivity – AF pt select', type:'select', value:'普通/Normal',
+          options:{ ja:['遅い','普通','速い'], en:['Slow','Normal','Fast'] }},
+        { id:'cc2_4', ja:'フォーカス/コントロールリング', en:'Focus/control ring', type:'select', value:'フォーカスリング/Focusing ring',
+          options:{ ja:['フォーカスリング','コントロールリング'], en:['Focusing ring','Control ring'] }},
+        { id:'cc2_5', ja:'フォーカスリングの回転方向', en:'Focus ring rotation',  type:'select', value:'通常方向/Normal',
+          options:{ ja:['通常方向','反転'], en:['Normal','Reverse'] }},
+        { id:'cc2_6', ja:'RFレンズのMFフォーカスリング感度', en:'RF lens MF focus ring sensitivity', type:'select', value:'回転量に連動/Linked to rotation speed',
+          options:{ ja:['回転量に連動','回転速度に連動'], en:['Linked to rotation degree','Linked to rotation speed'] }},
+      ]},
+      { page:3, ja:'カスタマイズ制御（再生）', en:'Customized controls (playback)', items:[
+        { id:'cc3_1', ja:'再生時のカスタマイズ（ボタン）', en:'Customize buttons for playback', type:'action', value:'→' },
+        { id:'cc3_2', ja:'ダイヤルの画像送りカット数',    en:'Image jump w/',              type:'select', value:'10枚/10 images',
+          options:{ ja:['1枚','10枚','100枚','日付','フォルダー','動画','静止画','レーティング','保護'], en:['1 image','10 images','100 images','Date','Folder','Movies','Stills','Rating','Protected'] }},
+        { id:'cc3_3', ja:'ダイヤル+のカット数',           en:'Img jump w/+',               type:'select', value:'レーティング/Rating',
+          options:{ ja:['1枚','10枚','100枚','日付','フォルダー','レーティング'], en:['1 image','10 images','100 images','Date','Folder','Rating'] }},
+        { id:'cc3_4', ja:'再生時の☆と☆☆の切り換え', en:'Switch dials during playback', type:'action', value:'→' },
+      ]},
+      { page:4, ja:'カスタマイズ制御/リセット', en:'Customized controls/Reset', items:[
+        { id:'cc4_1', ja:'視線入力',                en:'Eye control',              type:'action', value:'→' },
+        { id:'cc4_2', ja:'タッチ操作',              en:'Touch control',            type:'select', value:'標準/Standard',
+          options:{ ja:['しない','標準','敏感'], en:['Disable','Standard','Sensitive'] }},
+      ]},
+    ]
+  },
+  {
+    id:'cfn', ja:'カスタム機能', en:'Custom Functions', color:'#805010',
+    pages:[
+      { page:1, ja:'撮影モード/露出', en:'Shooting mode/Exposure', items:[
+        { id:'cf1_1', ja:'使用できる撮影モードの制限', en:'Restrict shooting modes',    type:'action', value:'→' },
+        { id:'cf1_2', ja:'露出レベル設定',              en:'Exposure level increments',  type:'select', value:'1/3段/1/3-stop',
+          options:{ ja:['1/3段','1/2段'], en:['1/3-stop','1/2-stop'] }},
+        { id:'cf1_3', ja:'ISO感度の設定段数',           en:'ISO speed setting increments', type:'select', value:'1/3段/1/3-stop',
+          options:{ ja:['1/3段','1段'], en:['1/3-stop','1-stop'] }},
+        { id:'cf1_4', ja:'測光後のシャッタースピード',  en:'Speed from metering/ISO Auto', type:'action', value:'→' },
+        { id:'cf1_5', ja:'ブラケティングの自動解除',    en:'Bracketing auto cancel',     type:'select', value:'する/Enable',
+          options:{ ja:['する','しない'], en:['Enable','Disable'] }},
+        { id:'cf1_6', ja:'ブラケティング撮影の順序',    en:'Bracketing sequence',        type:'select', value:'0→-→+',
+          options:{ ja:['0→-→+','-→0→+','+→0→-'], en:['0/-/+','-/0/+','+/0/-'] }},
+        { id:'cf1_7', ja:'ブラケティングのコマ数',      en:'Number of bracketed shots',  type:'select', value:'3枚/3 shots',
+          options:{ ja:['2枚','3枚','5枚','7枚'], en:['2 shots','3 shots','5 shots','7 shots'] }},
+      ]},
+      { page:2, ja:'露出', en:'Exposure', items:[
+        { id:'cf2_1', ja:'安全シフト',               en:'Safety shift',              type:'select', value:'しない/Disable',
+          options:{ ja:['しない','Tv/Av','ISO感度'], en:['Disable','Shutter speed/Aperture','ISO speed'] }},
+        { id:'cf2_2', ja:'同じEVでの絞り変更',       en:'Same expo. for new aperture', type:'select', value:'しない/Off',
+          options:{ ja:['しない','する'], en:['Off','On'] }},
+        { id:'cf2_3', ja:'フォーカス後のAEロック', en:'AE lock meter. mode after focus', type:'select', value:'しない/Off',
+          options:{ ja:['しない','する'], en:['Off','On'] }},
+        { id:'cf2_4', ja:'シャッタースピードの範囲設定', en:'Set shutter speed range', type:'action', value:'→' },
+        { id:'cf2_5', ja:'絞り値の範囲設定',         en:'Set aperture range',        type:'action', value:'→' },
+        { id:'cf2_6', ja:'AEミクロ調整',             en:'AE Microadjustment',        type:'action', value:'→' },
+        { id:'cf2_7', ja:'FEミクロ調整',             en:'FE Microadjustment',        type:'action', value:'→' },
+      ]},
+      { page:3, ja:'ドライブ', en:'Drive', items:[
+        { id:'cf3_1', ja:'連続撮影速度',             en:'Continuous shooting speed', type:'action', value:'→' },
+        { id:'cf3_2', ja:'連続撮影上限コマ数制限',   en:'Limit continuous shot count', type:'action', value:'→' },
+      ]},
+      { page:4, ja:'各種設定/リセット', en:'Various settings/Reset', items:[
+        { id:'cf4_1', ja:'トリミング情報付加',       en:'Add cropping information',  type:'select', value:'しない/Off',
+          options:{ ja:['しない','アスペクト比のみ','アスペクト比+範囲'], en:['Off','Aspect ratio only','Aspect ratio + range'] }},
+        { id:'cf4_2', ja:'消去ボタンのデフォルト設定', en:'Default Erase option',   type:'select', value:'キャンセルを選択/Cancel selected',
+          options:{ ja:['キャンセルを選択','消去を選択'], en:['Cancel selected','Erase selected'] }},
+        { id:'cf4_3', ja:'レンズなしでの絞り設定',   en:'Av setting without lens',  type:'select', value:'しない/Disable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+        { id:'cf4_4', ja:'レンズなしでのレリーズ',   en:'Release shutter w/o lens', type:'select', value:'しない/Disable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+        { id:'cf4_5', ja:'電源オフ時にレンズを格納', en:'Retract lens on power off', type:'select', value:'する/Enable',
+          options:{ ja:['する','しない'], en:['Enable','Disable'] }},
+        { id:'cf4_6', ja:'IPTC情報の付加',           en:'Add IPTC information',      type:'action', value:'→' },
+        { id:'cf4_7', ja:'カスタム機能を全解除',     en:'Clear all Custom Func. (C.Fn)', type:'action', value:'→ 実行/Execute' },
+      ]},
+    ]
+  },
+  {
+    id:'my', ja:'マイメニュー', en:'My Menu', color:'#208040',
+    pages:[
+      { page:1, ja:'マイメニュー管理', en:'My Menu management', items:[
+        { id:'my_1', ja:'マイメニュータブを追加',       en:'Add My Menu tab',           type:'action', value:'→ 実行/Execute' },
+        { id:'my_2', ja:'マイメニュータブを全削除',     en:'Delete all My Menu tabs',   type:'action', value:'→ 実行/Execute' },
+        { id:'my_3', ja:'登録した項目を全削除',         en:'Delete all items',          type:'action', value:'→ 実行/Execute' },
+        { id:'my_4', ja:'メニュー表示',                 en:'Menu display',              type:'select', value:'通常表示/Normal display',
+          options:{ ja:['通常表示','マイメニュータブから表示','マイメニュータブのみ表示'], en:['Normal display','Display from My Menu tab','Display only My Menu tab'] }},
+      ]},
+    ]
+  },
+]},
+
+/* ────────── 動画モード ────────── */
+movie:{ tabs:[
+  {
+    id:'mrec', ja:'動画撮影', en:'Movie rec.', color:'#c03020',
+    pages:[
+      { page:1, ja:'画質/サイズ', en:'Image quality/size', items:[
+        { id:'m1_1', ja:'動画記録サイズ',       en:'Movie rec. size',             type:'action', value:'→',
+          mrData:{ resId:'fhd', fps:'29.97', compIconId:'std_lgop' }},
+        { id:'m1_2', ja:'ハイフレームレート',   en:'High Frame Rate',             type:'select', value:'切/Off',
+          options:{ ja:['切','入'], en:['Off','On'] }},
+        { id:'m1_3', ja:'メイン記録形式',       en:'Main rec. format',            type:'select', value:'XF-AVC S YCC420 8bit/XF-AVC S YCC420 8bit',
+          options:{
+            ja:['RAW','XF-HEVC S YCC422 10bit','XF-HEVC S YCC420 10bit','XF-AVC S YCC422 10bit','XF-AVC S YCC420 8bit'],
+            en:['RAW','XF-HEVC S YCC422 10bit','XF-HEVC S YCC420 10bit','XF-AVC S YCC422 10bit','XF-AVC S YCC420 8bit']
+          }},
+        { id:'m1_4', ja:'動画クロップ',         en:'Movie cropping',              type:'select', value:'しない/Off',
+          options:{ ja:['しない','する'], en:['Off','On'] }},
+        { id:'m1_5', ja:'動画撮影中静止画記録', en:'Dual shooting (still&movie)', type:'select', value:'OFF/Off',
+          options:{ ja:['OFF','ON'], en:['Off','On'] }},
+      ]},
+      { page:2, ja:'音声録音設定', en:'Sound-rec. settings', items:[
+        { id:'m2_1', ja:'音声録音',             en:'Sound recording',             type:'select', value:'オート/Auto',
+          options:{ ja:['しない','オート','マニュアル'], en:['Disable','Auto','Manual'] }},
+        { id:'m2_2', ja:'音声形式',             en:'Audio format',                type:'select', value:'AAC',
+          options:{ ja:['AAC','LPCM'], en:['AAC','LPCM'] }},
+        { id:'m2_3', ja:'オーディオ設定',       en:'Audio settings',              type:'action', value:'→' },
+        { id:'m2_4', ja:'オーディオ状態',       en:'Audio Status',                type:'action', value:'→' },
+      ]},
+      { page:3, ja:'露出', en:'Exposure', items:[
+        { id:'m3_1', ja:'露出補正',             en:'Exposure comp.',              type:'display', value:'0' },
+        { id:'m3_2', ja:'ISO感度設定',          en:'ISO speed settings',          type:'action', value:'→' },
+        { id:'m3_3', ja:'高周波フリッカーレス撮影', en:'HF anti-flicker shooting', type:'select', value:'しない/Disable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+        { id:'m3_4', ja:'絞り値を1/8段で設定', en:'Av 1/8-stop incr.',           type:'select', value:'しない/Disable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+        { id:'m3_5', ja:'自動スローシャッター', en:'Auto slow shutter',           type:'select', value:'する/Enable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+        { id:'m3_6', ja:'AF中の自動露出優先', en:'Detect priority AE while AF',  type:'select', value:'しない/Disable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+      ]},
+      { page:4, ja:'色調/ダイナミックレンジ', en:'Color/tone/Dynamic range', items:[
+        { id:'m4_1', ja:'カスタムピクチャー',   en:'Custom Picture',              type:'action', value:'→' },
+        { id:'m4_2', ja:'ピクチャースタイル',   en:'Picture Style',               type:'select', value:'スタンダード/Standard',
+          options:{ ja:['オート','スタンダード','ポートレート','風景','ニュートラル','忠実設定','モノクロ','ユーザー設定1'], en:['Auto','Standard','Portrait','Landscape','Neutral','Faithful','Monochrome','User Def.1'] }},
+        { id:'m4_3', ja:'クラリティ',           en:'Clarity',                     type:'select', value:'0',
+          options:{ ja:['-4','-3','-2','-1','0','+1','+2','+3','+4'], en:['-4','-3','-2','-1','0','+1','+2','+3','+4'] }},
+        { id:'m4_4', ja:'HDR撮影（PQ）',        en:'HDR shooting (PQ)',           type:'select', value:'しない/Disable HDR',
+          options:{ ja:['しない','HDR撮影する'], en:['Disable HDR','Enable HDR'] }},
+        { id:'m4_5', ja:'HDR動画モード',        en:'HDR Movie Mode',              type:'select', value:'切/Off',
+          options:{ ja:['切','入'], en:['Off','On'] }},
+        { id:'m4_6', ja:'自動輝度最適化',       en:'Auto Lighting Optimizer',     type:'select', value:'標準/Standard',
+          options:{ ja:['しない','弱め','標準','強め'], en:['Disable','Low','Standard','High'] }},
+        { id:'m4_7', ja:'ハイライト優先',       en:'Highlight tone priority',     type:'select', value:'しない/Disable',
+          options:{ ja:['しない','する','強め'], en:['Disable','Enable','Enhanced'] }},
+      ]},
+      { page:5, ja:'ホワイトバランス/画質補正', en:'White balance/Quality correction', items:[
+        { id:'m5_1', ja:'ホワイトバランス',     en:'White balance',               type:'select', value:'AWB（白を優先）',
+          options:{ ja:['AWB（白を優先）','AWB（雰囲気を優先）','太陽光','日陰','くもり','白熱電球','白色蛍光灯','ストロボ','カスタム'], en:['AWB (White Priority)','AWB (Ambience Priority)','Daylight','Shade','Cloudy','Tungsten','White fluorescent','Flash','Custom'] }},
+        { id:'m5_2', ja:'カスタムホワイトバランス', en:'Set Custom WB',           type:'action', value:'→' },
+        { id:'m5_3', ja:'WB補正',               en:'WB correction',              type:'display', value:'0, 0' },
+        { id:'m5_4', ja:'レンズ光学補正',       en:'Lens aberration correction',  type:'action', value:'→' },
+        { id:'m5_5', ja:'高感度撮影時のノイズ低減', en:'High ISO speed NR',       type:'select', value:'標準/Standard',
+          options:{ ja:['マルチショット','強め','標準','弱め','しない'], en:['Multi Shot','High','Standard','Low','Disable'] }},
+      ]},
+      { page:6, ja:'各種撮影機能', en:'Various shooting', items:[
+        { id:'m6_1', ja:'プレ記録設定',         en:'Pre-recording set.',          type:'select', value:'切/Off',
+          options:{ ja:['切','入'], en:['Off','On'] }},
+        { id:'m6_2', ja:'タイムラプス動画',     en:'Time-lapse movie',            type:'action', value:'する/Enable' },
+      ]},
+      { page:7, ja:'シャッター制御/撮影アシスト', en:'Shutter control/Assist shooting', items:[
+        { id:'m7_1', ja:'動画セルフタイマー',   en:'Movie self-timer',            type:'select', value:'切/Off',
+          options:{ ja:['切','2秒','10秒'], en:['Off','2 sec','10 sec'] }},
+        { id:'m7_2', ja:'タリーランプ',         en:'Tally lamp',                  type:'select', value:'する/Enable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+        { id:'m7_3', ja:'手ブレ補正(IS)モード', en:'IS (Image Stabilizer) mode', type:'select', value:'入/On',
+          options:{ ja:['切','入','拡張IS'], en:['Off','On','Enhanced IS'] }},
+        { id:'m7_4', ja:'水平自動補正',         en:'Auto level',                  type:'select', value:'する/Enable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+        { id:'m7_5', ja:'クイックコントロールカスタマイズ', en:'Customize Quick Controls', type:'action', value:'→' },
+        { id:'m7_6', ja:'測光タイマー',         en:'Metering timer',              type:'select', value:'8秒/8 sec.',
+          options:{ ja:['4秒','8秒','16秒','30秒','1分'], en:['4 sec.','8 sec.','16 sec.','30 sec.','1 min.'] }},
+      ]},
+      { page:8, ja:'撮影アシスト', en:'Assist shooting', items:[
+        { id:'m8_1', ja:'メタデータ',                en:'Metadata',                    type:'action', value:'→' },
+        { id:'m8_2', ja:'タイムコード',              en:'Time code',                   type:'action', value:'→' },
+        { id:'m8_3', ja:'HDR/ClogViewアシスト',     en:'HDR/C.Log View Assist.',      type:'select', value:'しない/Off',
+          options:{ ja:['しない','する'], en:['Off','On'] }},
+        { id:'m8_4', ja:'フォルスカラー設定',        en:'False color set.',            type:'action', value:'→' },
+        { id:'m8_5', ja:'ゼブラ設定',               en:'Zebra settings',              type:'action', value:'→' },
+      ]},
+      { page:9, ja:'撮影情報表示/HDMI', en:'Assist shooting/HDMI', items:[
+        { id:'m9_1', ja:'撮影情報表示設定',     en:'Shooting info. disp.',        type:'action', value:'→' },
+        { id:'m9_2', ja:'クイックコントロール画面', en:'Quick Ctrl screen',        type:'action', value:'→' },
+        { id:'m9_3', ja:'ファインダー表示形式', en:'VF display format',           type:'select', value:'表示1/Show 1',
+          options:{ ja:['表示1','表示2','表示3'], en:['Show 1','Show 2','Show 3'] }},
+        { id:'m9_4', ja:'反転表示',             en:'Reverse display',             type:'select', value:'しない/Off',
+          options:{ ja:['しない','する'], en:['Off','On'] }},
+        { id:'m9_5', ja:'高温時自動電源オフ温度', en:'Auto pwr off temp.',        type:'select', value:'標準/Standard',
+          options:{ ja:['標準','高め'], en:['Standard','High'] }},
+        { id:'m9_6', ja:'スタンバイ時の低解像度表示', en:'Standby: Low res.',     type:'select', value:'しない/Off',
+          options:{ ja:['しない','する'], en:['Off','On'] }},
+        { id:'m9_7', ja:'終了警告ガイダンス',   en:'Shutdown warning guidance',   type:'action', value:'→' },
+        { id:'m9_8', ja:'HDMI表示',             en:'HDMI display',                type:'action', value:'→' },
+        { id:'m9_9', ja:'HDMI RAW出力',         en:'HDMI RAW output',             type:'select', value:'しない/Off',
+          options:{ ja:['しない','する'], en:['Off','On'] }},
+        { id:'m9_10',ja:'CLogのHDMI出力範囲',  en:'HDMI output range for C.Log', type:'action', value:'→' },
+      ]},
+    ]
+  },
+  {
+    id:'maf', ja:'AF（動画）', en:'AF (Movie)', color:'#7030a0',
+    pages:[
+      { page:1, ja:'AF動作/エリア', en:'AF operation/area', items:[
+        { id:'ma1_1', ja:'AF動作', en:'AF operation', type:'select', value:'サーボAF/Servo AF',
+          options:{ ja:['ワンショットAF','サーボAF'], en:['One-Shot AF','Servo AF'] }},
+        { id:'ma1_2', ja:'AFエリア', en:'AF area', type:'select', value:'全域AF/Whole area AF',
+          options:{ ja:['スポット1点AF','1点AF','領域拡大AF（手動選択:☩）','全域AF'], en:['Spot AF','1-point AF','Expand AF area: ☩','Whole area AF'] }},
+        { id:'ma1_3', ja:'フォーカスモード', en:'Focus mode', type:'select', value:'AF',
+          options:{ ja:['AF','MF'], en:['AF','MF'] }},
+      ]},
+      { page:2, ja:'被写体検出', en:'Subject detection', items:[
+        { id:'ma2_1', ja:'検出する被写体', en:'Subject to detect', type:'select', value:'自動/Auto',
+          options:{ ja:['なし（優先しない）','人物','動物（鳥含む）','乗り物','自動'], en:['No priority','People','Animals','Vehicles','Auto'] }},
+        { id:'ma2_2', ja:'瞳検出', en:'Eye detection', type:'select', value:'する/Enable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+      ]},
+      { page:3, ja:'動画サーボAF速度', en:'Movie Servo AF speed', items:[
+        { id:'ma3_1', ja:'動画サーボAF速度', en:'Movie Servo AF speed', type:'select', value:'0',
+          options:{ ja:['-4','-3','-2','-1','0','+1','+2','+3','+4'], en:['-4','-3','-2','-1','0','+1','+2','+3','+4'] }},
+        { id:'ma3_2', ja:'動画サーボAFの追尾感度', en:'Movie Servo AF track. sensitivity', type:'select', value:'中/Middle',
+          options:{ ja:['低','中','高'], en:['Low','Middle','High'] }},
+      ]},
+      { page:4, ja:'MF関連', en:'MF related', items:[
+        { id:'ma4_1', ja:'MFピーキング設定', en:'MF peaking settings', type:'action', value:'→' },
+        { id:'ma4_2', ja:'フォーカスガイド', en:'Focus guide', type:'select', value:'しない/Disable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+      ]},
+    ]
+  },
+  {
+    id:'mplay', ja:'再生', en:'Playback', color:'#2060c8',
+    pages:[
+      { page:1, ja:'ファイル操作', en:'File operation', items:[
+        { id:'mp1_1', ja:'画像を保護する', en:'Protect images', type:'action', value:'→' },
+        { id:'mp1_2', ja:'画像を消去する', en:'Erase images',   type:'action', value:'→' },
+        { id:'mp1_3', ja:'静止画を回転する', en:'Rotate stills', type:'action', value:'→' },
+        { id:'mp1_4', ja:'動画の向き情報を変更', en:'Change mov rotate info', type:'action', value:'→' },
+        { id:'mp1_5', ja:'レーティング', en:'Rating', type:'action', value:'→' },
+      ]},
+      { page:2, ja:'ファイル操作2', en:'File operation 2', items:[
+        { id:'mp2_1', ja:'画像をコピーする', en:'Image copy',    type:'action', value:'→' },
+        { id:'mp2_2', ja:'プリント指定（DPOF）', en:'Print order', type:'action', value:'→' },
+      ]},
+      { page:3, ja:'再生方法', en:'Playback method', items:[
+        { id:'mp3_1', ja:'スライドショー', en:'Slide show', type:'action', value:'→' },
+        { id:'mp3_2', ja:'拡大率（初期値）', en:'Magnification', type:'action', value:'→' },
+      ]},
+      { page:4, ja:'各種設定', en:'Various settings', items:[
+        { id:'mp4_1', ja:'再生情報表示', en:'Playback information display', type:'action', value:'→' },
+        { id:'mp4_2', ja:'ハイライト警告', en:'Highlight alert', type:'select', value:'しない/Disable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+        { id:'mp4_3', ja:'AF点の表示', en:'AF point disp.', type:'select', value:'する/Enable',
+          options:{ ja:['しない','する'], en:['Disable','Enable'] }},
+      ]},
+    ]
+  },
+  {
+    id:'mcomm', ja:'通信機能', en:'Communication', color:'#7030b0',
+    pages:[
+      { page:1, ja:'ネットワーク設定', en:'Network settings', items:[
+        { id:'mc1_1', ja:'ネットワーク設定', en:'Network settings', type:'action', value:'→' },
+        { id:'mc1_2', ja:'機内モード', en:'Airplane mode', type:'select', value:'切/Off',
+          options:{ ja:['切','入'], en:['Off','On'] }},
+        { id:'mc1_3', ja:'Bluetooth設定', en:'Bluetooth settings', type:'action', value:'→' },
+      ]},
+      { page:2, ja:'ネットワーク機能', en:'Network function', items:[
+        { id:'mc2_1', ja:'FTPサーバーに転送', en:'Transfer images to FTP server', type:'action', value:'→' },
+        { id:'mc2_2', ja:'EOS Utilityと接続する', en:'Connect to EOS Utility', type:'action', value:'→' },
+      ]},
+    ]
+  },
+  {
+    id:'msetup', ja:'セットアップ', en:'Set-up', color:'#b08000',
+    pages:[
+      { page:1, ja:'ファイル/カード設定', en:'File/card setting', items:[
+        { id:'ms1_1', ja:'記録機能+カード・フォルダー選択', en:'Record func+card/folder sel.', type:'action', value:'→' },
+        { id:'ms1_2', ja:'クリップ番号', en:'Clip Number', type:'select', value:'通し番号/Continuous',
+          options:{ ja:['通し番号','自動リセット'], en:['Continuous','Auto reset'] }},
+        { id:'ms1_3', ja:'ファイル名', en:'File name', type:'display', value:'MVI_' },
+        { id:'ms1_4', ja:'カードの初期化', en:'Format card', type:'action', value:'→ 実行/Execute' },
+      ]},
+      { page:2, ja:'地域/ガイダンス/音声設定', en:'Country/Area/Guidance/Audio', items:[
+        { id:'ms2_1', ja:'日付/時刻/エリア', en:'Date/Time/Zone', type:'action', value:'→' },
+        { id:'ms2_2', ja:'言語', en:'Language', type:'select', value:'日本語',
+          options:{ ja:['日本語','English','Deutsch','Français','한국어','简体中文'], en:['日本語','English','Deutsch','Français','한국어','简体中文'] }},
+        { id:'ms2_3', ja:'映像方式', en:'System frequency', type:'select', value:'59.94Hz',
+          options:{ ja:['59.94Hz','50.00Hz'], en:['59.94 Hz','50.00 Hz'] }},
+        { id:'ms2_4', ja:'ビープ音', en:'Beep', type:'select', value:'入/Enable',
+          options:{ ja:['切','小さく鳴らす','入'], en:['Disable','Enable (low volume)','Enable'] }},
+        { id:'ms2_5', ja:'音量', en:'Volume', type:'select', value:'5',
+          options:{ ja:['0','1','2','3','4','5','6','7','8'], en:['0','1','2','3','4','5','6','7','8'] }},
+        { id:'ms2_6', ja:'音声モニター', en:'Audio monitor', type:'action', value:'→' },
+      ]},
+      { page:3, ja:'表示/電源', en:'Display/Power', items:[
+        { id:'ms3_1', ja:'モニターの明るさ', en:'Screen brightness', type:'select', value:'4',
+          options:{ ja:['1','2','3','4','5','6','7'], en:['1','2','3','4','5','6','7'] }},
+        { id:'ms3_2', ja:'HDMI解像度', en:'HDMI resolution', type:'select', value:'自動/Auto',
+          options:{ ja:['自動','1080p','4K'], en:['Auto','1080p','4K'] }},
+        { id:'ms3_3', ja:'節電設定', en:'Power saving', type:'action', value:'→' },
+      ]},
+    ]
+  },
+  {
+    id:'mctrl', ja:'カスタマイズ制御', en:'Ctrl customization', color:'#d07020',
+    pages:[
+      { page:1, ja:'カスタマイズ制御（動画）', en:'Customized controls (movie)', items:[
+        { id:'mcc1_1', ja:'撮影時のカスタマイズ（ボタン）', en:'Customize buttons for shooting', type:'action', value:'→' },
+        { id:'mcc1_2', ja:'動画撮影時のシャッターボタン機能', en:'Shutter btn function for movies', type:'action', value:'→' },
+        { id:'mcc1_3', ja:'撮影時のカスタマイズ（ダイヤル/リング）', en:'Customize dials/control ring', type:'action', value:'→' },
+        { id:'mcc1_4', ja:'Tv/Avの設定方向', en:'Direction to set Tv/Av', type:'select', value:'通常方向/Normal',
+          options:{ ja:['通常方向','反転'], en:['Normal','Reverse direction'] }},
+        { id:'mcc1_5', ja:'マルチファンクションロック', en:'Multi function lock', type:'action', value:'→' },
+      ]},
+      { page:2, ja:'カスタマイズ制御（AF）', en:'Customized controls (AF)', items:[
+        { id:'mcc2_1', ja:'タッチ&ドラッグAF設定', en:'Touch & drag AF settings', type:'action', value:'→' },
+        { id:'mcc2_2', ja:'RFレンズのMFフォーカスリング感度', en:'RF lens MF focus ring sensitivity', type:'select', value:'回転量に連動/Linked to rotation speed',
+          options:{ ja:['回転量に連動','回転速度に連動'], en:['Linked to rotation degree','Linked to rotation speed'] }},
+      ]},
+    ]
+  },
+  {
+    id:'my', ja:'マイメニュー', en:'My Menu', color:'#208040',
+    pages:[
+      { page:1, ja:'マイメニュー管理', en:'My Menu management', items:[
+        { id:'mmy_1', ja:'マイメニュータブを追加', en:'Add My Menu tab', type:'action', value:'→ 実行/Execute' },
+        { id:'mmy_2', ja:'マイメニュータブを全削除', en:'Delete all My Menu tabs', type:'action', value:'→ 実行/Execute' },
+        { id:'mmy_3', ja:'登録した項目を全削除', en:'Delete all items', type:'action', value:'→ 実行/Execute' },
+        { id:'mmy_4', ja:'メニュー表示', en:'Menu display', type:'select', value:'通常表示/Normal display',
+          options:{ ja:['通常表示','マイメニュータブから表示','マイメニュータブのみ表示'], en:['Normal display','Display from My Menu tab','Display only My Menu tab'] }},
+      ]},
+    ]
+  },
+]}
+};
+
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  SECTION 2: STATE & HELPERS                                   ║
+   ║  状態変数 / ショートカット関数                                            ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+/* ── 状態 ── */
+let DEF = null, lang = 'ja', mode = 'stills';
+let tabIdx=0, pageIdx=0, rowIdx=0, inDialog=false, dOptIdx=0;
+
+const $=id=>document.getElementById(id);
+const L=key=>UI[lang][key];
+
+function modeDef()     { return DEF[mode]; }
+function currentTab()  { return modeDef().tabs[tabIdx]; }
+function currentPage() { return currentTab().pages[pageIdx]; }
+function currentItems(){ return currentPage().items; }
+function currentItem() { return currentItems()[rowIdx]; }
+function tabColor()    { return currentTab().color; }
+function tlabel(tab)   { return lang==='ja' ? tab.ja  : tab.en; }
+function plabel(pg)    { return lang==='ja' ? pg.ja   : pg.en; }
+function ilabel(item)  { return lang==='ja' ? item.ja : item.en; }
+function ivalue(item)  {
+  // value は "日本語/English" 形式なら言語に応じて分割（options 有無を問わない）
+  const v = String(item.value);
+  if(v.indexOf('/') === -1) return v;
+  if(lang==='ja') return v.split('/')[0];
+  return v.split('/').slice(1).join('/') || v;
+}
+function optLabel(item, idx) {
+  if(!item.options) return '';
+  const arr = item.options[lang] || item.options.ja;
+  return arr[idx] || '';
+}
+function optCount(item) {
+  if(!item.options) return 0;
+  return (item.options[lang] || item.options.ja).length;
+}
+
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  SECTION 3: CORE — INIT / LANG / MODE                         ║
+   ║  init / setLang / applyUILang / switchMode                   ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+/* ── 初期化 ── */
+function init() {
+  DEF = JSON.parse(JSON.stringify(SAMPLE));
+  $('ed').value = JSON.stringify(SAMPLE, null, 2);
+  applyUILang();
+  resetSim();
+  bindKeys();
+  bindButtons();
+}
+
+/* ── 言語切替 ── */
+function setLang(l) {
+  lang = l;
+  $('btnJa').className = 'lang-btn' + (l==='ja' ? ' active' : '');
+  $('btnEn').className = 'lang-btn' + (l==='en' ? ' active' : '');
+  applyUILang();
+  render();
+  if(isMrWizard()) mrRenderAll(); /* ウィザード中も即時反映 */
+  if(isTlWizard()) tlRender();   /* タイムラプスウィザード中も即時反映 */
+  addLog('info','🌐 LANG', l==='ja'?'日本語に切替':'Switched to English');
+}
+
+function applyUILang() {
+  $('lbl-device').textContent  = L('device');
+  $('lbl-stills').textContent  = L('stills');
+  $('lbl-movie').textContent   = L('movie');
+  $('lbl-editor').textContent  = L('editor');
+  $('lbl-log').textContent     = L('log');
+  $('lbl-state').textContent   = L('state');
+  $('btn-apply').textContent   = L('apply');
+  $('btn-reset').textContent   = L('reset');
+  $('btn-sample').textContent  = L('sample');
+  $('btn-clear').textContent   = L('clear');
+  $('hintL').textContent       = L('hintL');
+  $('hintR').textContent       = L('hintR');
+  $('kguide').innerHTML        = L('kguide');
+  $('lbl-screenshot').textContent = L('screenshot');
+}
+
+/* ── モード切替 ── */
+function switchMode(m) {
+  if(m===mode) return;
+  mode=m; tabIdx=0; pageIdx=0; rowIdx=0; inDialog=false; removeDialog();
+  const mv=m==='movie';
+  $('btnStills').className='mode-btn'+(mv?'':' as');
+  $('btnMovie').className ='mode-btn'+(mv?' am':'');
+  $('lcd').className      ='lcd'+(mv?' mm':'');
+  render();
+  addLog('mode', mv?'🎬':'📷', L(mv?'mode_movie':'mode_stills'));
+}
+
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  SECTION 4: CORE — RENDER                                     ║
+   ║  render / renderTabBar / renderSubBar / renderItems / renderState║
+   ╚══════════════════════════════════════════════════════════════╝ */
+/* ── レンダリング ── */
+function render() {
+  renderTabBar(); renderSubBar(); renderItems(); renderState();
+  $('lcd').style.setProperty('--tc', tabColor());
+}
+
+/* ── メインタブ SVG アイコン定義 / EOS R5 Mark II 公式マニュアル準拠の単色アイコン
+       色は CSS 側で制御:
+         - 外形は fill="currentColor" → CSSの color プロパティ (idle=#9097a0 / active=#fff)
+         - 内側のくり抜きは fill="var(--icon-bg)" → 親の背景色 (idle=#060a0d / active=タブカラー)
+       静止画/動画モードで shoot タブのアイコンは共通 (mrec も同じカメラアイコン) ── */
+const TAB_ICONS = {
+  /* SHOOT (静止画/動画共通) — カメラ本体: 矩形ボディ + ファインダー突起 + レンズ円 */
+  shoot: ()=>`<svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 6.5 H18 V17 H2 Z M6.5 6.5 L7 4.8 L13 4.8 L13.5 6.5 Z M13.8 5.3 H15.8 V6.9 H13.8 Z" fill="currentColor"/>
+    <circle cx="10" cy="11.7" r="3" fill="var(--icon-bg)"/>
+    <circle cx="10" cy="11.7" r="1.6" fill="currentColor"/>
+  </svg>`,
+
+  /* AF — 太字テキストのみ */
+  af: ()=>`<svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+    <text x="10" y="14.5" text-anchor="middle" font-size="11" font-weight="700" font-family="Arial,sans-serif" fill="currentColor">AF</text>
+  </svg>`,
+
+  /* PLAY — 角丸矩形 + 中の三角 (▶) */
+  play: ()=>`<svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+    <rect x="2" y="5" width="16" height="10" rx="1.2" fill="currentColor"/>
+    <path d="M8 7.5 L13 10 L8 12.5 Z" fill="var(--icon-bg)"/>
+  </svg>`,
+
+  /* COMM — ジグザグ波線 (〜風) */
+  comm: ()=>`<svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 13 L6 7 L10 13 L14 7 L18 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </svg>`,
+
+  /* SETUP — レンチ (塗りつぶしシルエット) */
+  setup: ()=>`<svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+    <path d="M14 2 Q17.5 2 17.5 5.5 Q17.5 9 14 9 Q13 9 12.2 8.6 L4.5 16.3 Q3.5 17.3 2.5 16.3 Q1.5 15.3 2.5 14.3 L10.2 6.6 Q9.8 5.8 9.8 4.8 Q9.8 2 13 2 Z" fill="currentColor"/>
+  </svg>`,
+
+  /* CTRL — 円 + 抜きの扇形 (円グラフ風ダイヤル) */
+  ctrl: ()=>`<svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="10" cy="10" r="7" fill="currentColor"/>
+    <path d="M10 10 L10 3 A7 7 0 0 1 16.5 13.5 Z" fill="var(--icon-bg)"/>
+  </svg>`,
+
+  /* C.Fn — カメラ背面ビュー: 液晶画面 + 右側ボタン3つ */
+  cfn: ()=>`<svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+    <rect x="2" y="3.5" width="16" height="13" rx="1.5" fill="currentColor"/>
+    <rect x="3.2" y="4.7" width="11" height="8" fill="var(--icon-bg)"/>
+    <circle cx="16" cy="6" r="0.8" fill="var(--icon-bg)"/>
+    <circle cx="16" cy="9" r="0.8" fill="var(--icon-bg)"/>
+    <circle cx="16" cy="12" r="0.8" fill="var(--icon-bg)"/>
+  </svg>`,
+
+  /* MY — 5角星 */
+  my: ()=>`<svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 2 L12.2 7.6 L18.4 7.6 L13.6 11.4 L15.5 17.2 L10 13.6 L4.5 17.2 L6.4 11.4 L1.6 7.6 L7.8 7.6 Z" fill="currentColor"/>
+  </svg>`,
+};
+/* 動画モードのタブはアイコンを静止画モードと共通化 (shoot/af/play/comm/setup/ctrl/my) */
+TAB_ICONS.mrec  = TAB_ICONS.shoot;
+TAB_ICONS.maf   = TAB_ICONS.af;
+TAB_ICONS.mplay = TAB_ICONS.play;
+TAB_ICONS.mcomm = TAB_ICONS.comm;
+TAB_ICONS.msetup= TAB_ICONS.setup;
+TAB_ICONS.mctrl = TAB_ICONS.ctrl;
+
+/* SVG は currentColor を使うので color 引数は不要だが、後方互換のため受け取って無視する */
+function getTabIcon(tabId, color) {
+  const fn = TAB_ICONS[tabId];
+  return fn ? fn() : TAB_ICONS.shoot();
+}
+
+function renderTabBar() {
+  const bar=$('tabBar'); bar.innerHTML='';
+  modeDef().tabs.forEach((tab,i)=>{
+    const el=document.createElement('div');
+    el.className='main-tab'+(i===tabIdx?' act':'');
+    el.style.setProperty('--tc',tab.color);
+    const iconWrap=document.createElement('div');
+    iconWrap.className='tab-icon';
+    iconWrap.innerHTML=getTabIcon(tab.id, tab.color);
+    el.appendChild(iconWrap);
+    el.addEventListener('click',()=>{tabIdx=i;pageIdx=0;rowIdx=0;render();addLog('tab','◀▶',tlabel(tab));});
+    bar.appendChild(el);
+  });
+}
+
+function renderSubBar() {
+  const bar=$('subBar'); bar.innerHTML='';
+  const pages=currentTab().pages;
+
+  /* 1行目：矩形タブ群（中央揃え） */
+  const tabsRow=document.createElement('div'); tabsRow.className='sub-tabs-row';
+  pages.forEach((pg,i)=>{
+    const el=document.createElement('div');
+    el.className='sub-tab'+(i===pageIdx?' act':'');
+    el.style.setProperty('--tc',tabColor());
+    el.addEventListener('click',()=>{pageIdx=i;rowIdx=0;render();addLog('tab','PG',`${pg.page}`);});
+    tabsRow.appendChild(el);
+  });
+  bar.appendChild(tabsRow);
+
+  /* 2行目：ページ名（左）＋ページ数（右） */
+  const infoRow=document.createElement('div'); infoRow.className='sub-info-row';
+  const lbl=document.createElement('div'); lbl.className='sub-lbl';
+  lbl.style.setProperty('--tc',tabColor());
+  lbl.textContent=plabel(currentPage());
+  const pgnum=document.createElement('div'); pgnum.className='sub-pgnum';
+  pgnum.textContent=`${pageIdx+1}/${pages.length}`;
+  infoRow.appendChild(lbl);
+  infoRow.appendChild(pgnum);
+  bar.appendChild(infoRow);
+}
+
+function renderItems() {
+  const area=$('itemsArea'); area.innerHTML='';
+  const items=currentItems();
+  const ROW_H=32, areaH=346-34-38-26;
+  const maxV=Math.floor(areaH/ROW_H);
+  const start=Math.max(0,Math.min(rowIdx-Math.floor(maxV/2),items.length-maxV));
+  items.slice(start,start+maxV).forEach((item,si)=>{
+    const ri=start+si, sel=ri===rowIdx;
+    const row=document.createElement('div');
+    row.className='mrow'+(sel?' sel':'')+(item.disabled?' dis':'');
+    row.style.setProperty('--tc',tabColor());
+
+    /* ラベル */
+    const labelEl=document.createElement('span');
+    labelEl.className='rl';
+    labelEl.textContent=ilabel(item);
+    row.appendChild(labelEl);
+
+    /* 値：動画記録サイズ行はSVGアイコン3連、それ以外はテキスト */
+    if(item.id==='m1_1' && item.mrData){
+      /* fps/圧縮方式アイコンは白固定。解像度アイコンも白に統一 (カーソル位置でも色を変えない) */
+      const iconColor = '#fff';
+      const valWrap=document.createElement('div');
+      valWrap.className='rv';
+      valWrap.style.cssText='display:flex;align-items:center;gap:6px;';
+
+      const resWrap=document.createElement('div');
+      resWrap.innerHTML=mrIconResSmall(item.mrData.resId, iconColor);
+      valWrap.appendChild(resWrap);
+
+      const fpsWrap=document.createElement('div');
+      fpsWrap.innerHTML=mrIconFpsSmall(item.mrData.fps, iconColor);
+      valWrap.appendChild(fpsWrap);
+
+      const compWrap=document.createElement('div');
+      compWrap.innerHTML=mrIconCompSmall(item.mrData.compIconId, iconColor);
+      valWrap.appendChild(compWrap);
+
+      row.appendChild(valWrap);
+    } else {
+      const valEl=document.createElement('span');
+      valEl.className='rv';
+      valEl.textContent=ivalue(item);
+      row.appendChild(valEl);
+    }
+
+    row.addEventListener('click',()=>{rowIdx=ri;render();});
+    row.addEventListener('dblclick',()=>{rowIdx=ri;execEnter();});
+    area.appendChild(row);
+  });
+}
+
+function renderState() {
+  const tab=currentTab(), pg=currentPage(), item=currentItems()[rowIdx];
+  const el=$('statep'); el.style.setProperty('--tc',tab.color);
+  const mspan=mode==='stills'
+    ?`<span style="color:var(--mode-s);font-weight:bold">📷 ${L('stills')}</span>`
+    :`<span style="color:var(--mode-m);font-weight:bold">🎬 ${L('movie')}</span>`;
+  el.innerHTML=`
+    <div class="sr"><span class="sk">Mode</span><span class="sv">${mspan}</span></div>
+    <div class="sr"><span class="sk">Tab</span><span class="sv" style="color:${tab.color};font-weight:bold">${esc(tlabel(tab))}</span></div>
+    <div class="sr"><span class="sk">Page</span><span class="sv">${pg.page}/${currentTab().pages.length} <span style="color:var(--text-dim)">${esc(plabel(pg))}</span></span></div>
+    <div class="sr"><span class="sk">Row</span><span class="sv">${rowIdx+1}/${currentItems().length}</span></div>
+    <div class="sr"><span class="sk">Item</span><span class="sv">${esc(item?ilabel(item):'—')}</span></div>
+    <div class="sr"><span class="sk">Value</span><span class="sv">${esc(item?ivalue(item):'—')}</span></div>
+    <div class="sr"><span class="sk">Type</span><span class="sv">${esc(item?item.type:'—')}</span></div>`;
+}
+
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  SECTION 5: CORE — NAVIGATION & DIALOG                        ║
+   ║  navUp/Down/Left/Right / execEnter/Back / openDialog / showSelect/Info║
+   ╚══════════════════════════════════════════════════════════════╝ */
+/* ── ナビゲーション ── */
+/* ウィザード中かどうか（動画記録サイズウィザード専用） */
+function isMrWizard() { return inDialog && !!document.getElementById('mrWiz'); }
+function isTlWizard() { return inDialog && !!document.getElementById('tlWiz'); }
+
+function navUp() {
+  if(isMrWizard()){ mrNavUp(); return; }
+  if(isTlWizard()){ tlNavUp(); return; }
+  if(inDialog){ dUp(); return; }
+  const l=currentItems().length; rowIdx=(rowIdx-1+l)%l; render(); addLog('nav','↑ UP',ilabel(currentItem()));
+}
+function navDown() {
+  if(isMrWizard()){ mrNavDown(); return; }
+  if(isTlWizard()){ tlNavDown(); return; }
+  if(inDialog){ dDown(); return; }
+  const l=currentItems().length; rowIdx=(rowIdx+1)%l; render(); addLog('nav','↓ DOWN',ilabel(currentItem()));
+}
+function navLeft() {
+  if(isMrWizard()){ mrNavLeft(); return; }
+  if(isTlWizard()){
+    if(TLW.editMode==='interval'||TLW.editMode==='shots') tlNavFieldLeft();
+    else tlBack();
+    return;
+  }
+  if(inDialog) return;
+  if(pageIdx>0){
+    pageIdx--; rowIdx=0; render();
+    addLog('tab','◀ PG', plabel(currentPage()));
+  } else if(tabIdx>0){
+    tabIdx--; pageIdx=currentTab().pages.length-1; rowIdx=0; render();
+    addLog('tab','◀◀ TAB', tlabel(currentTab()));
+  } else {
+    /* 先頭 → 末尾へ折り返し */
+    tabIdx=modeDef().tabs.length-1; pageIdx=currentTab().pages.length-1; rowIdx=0; render();
+    addLog('tab','◀ WRAP', tlabel(currentTab()));
+  }
+}
+function navRight() {
+  if(isMrWizard()){ mrNavRight(); return; }
+  if(isTlWizard()){
+    if(TLW.editMode==='interval'||TLW.editMode==='shots') tlNavFieldRight();
+    else tlEnter();
+    return;
+  }
+  if(inDialog) return;
+  if(pageIdx<currentTab().pages.length-1){
+    pageIdx++; rowIdx=0; render();
+    addLog('tab','▶ PG', plabel(currentPage()));
+  } else if(tabIdx<modeDef().tabs.length-1){
+    tabIdx++; pageIdx=0; rowIdx=0; render();
+    addLog('tab','▶▶ TAB', tlabel(currentTab()));
+  } else {
+    /* 末尾 → 先頭へ折り返し */
+    tabIdx=0; pageIdx=0; rowIdx=0; render();
+    addLog('tab','▶ WRAP', tlabel(currentTab()));
+  }
+}
+function execEnter() {
+  if(isMrWizard()){ mrEnter(); return; }
+  if(isTlWizard()){ tlEnter(); return; }
+  if(inDialog){ dConfirm(); return; }
+  const it=currentItem(); if(!it) return; openDialog(it);
+}
+function execBack() {
+  if(isMrWizard()){ mrBack(); return; }
+  if(isTlWizard()){ tlBack(); return; }
+  if(inDialog){ closeDialog(); return; }
+  addLog('back','MENU','Top level');
+}
+
+/* ── ダイアログ表示 / Dialog display ── */
+function showSelect(item) {
+  removeDialog();
+  const ov=document.createElement('div'); ov.className='ov'; ov.id='ov';
+  ov.style.setProperty('--tc',tabColor());
+  const arr=item.options[lang]||item.options.ja;
+  const opts=arr.map((o,i)=>`
+    <div class="dopt${i===dOptIdx?' sel':''}" data-i="${i}">
+      <span class="dbullet">${i===dOptIdx?'●':'○'}</span>${esc(o)}
+    </div>`).join('');
+  ov.innerHTML=`<div class="dbox">
+    <div class="dtit">${esc(ilabel(item))}</div>
+    <div class="dopts" id="dopts">${opts}</div>
+    <div class="dbtns">
+      <button class="dbtn ca" onclick="closeDialog()">MENU</button>
+      <button class="dbtn ok" onclick="dConfirm()">SET</button>
+    </div></div>`;
+  ov.querySelectorAll('.dopt').forEach(el=>{
+    el.addEventListener('click',()=>{dOptIdx=+el.dataset.i;refreshOpts(item);});
+    el.addEventListener('dblclick',()=>{dOptIdx=+el.dataset.i;dConfirm();});
+  });
+  $('lcd').appendChild(ov);
+}
+
+function refreshOpts(item) {
+  const c=$('dopts'); if(!c) return;
+  const arr=item.options[lang]||item.options.ja;
+  c.querySelectorAll('.dopt').forEach((el,i)=>{
+    el.className='dopt'+(i===dOptIdx?' sel':'');
+    el.querySelector('.dbullet').textContent=i===dOptIdx?'●':'○';
+  });
+}
+
+function showInfo(item, extra='') {
+  removeDialog();
+  const ov=document.createElement('div'); ov.className='ov'; ov.id='ov';
+  ov.style.setProperty('--tc',tabColor());
+  ov.innerHTML=`<div class="dbox">
+    <div class="dtit">${esc(ilabel(item))}</div>
+    <div class="dbody">${esc(extra||ivalue(item))}</div>
+    <div class="dbtns"><button class="dbtn ok" onclick="closeDialog()">OK</button></div>
+  </div>`;
+  $('lcd').appendChild(ov); inDialog=true;
+}
+
+function dUp()   { const it=currentItem(); if(!it?.options) return; dOptIdx=(dOptIdx-1+optCount(it)+optCount(it))%optCount(it); refreshOpts(it); }
+function dDown() { const it=currentItem(); if(!it?.options) return; dOptIdx=(dOptIdx+1)%optCount(it); refreshOpts(it); }
+
+function dConfirm() {
+  const it=currentItem();
+  if(it?.options){
+    const arr=it.options[lang]||it.options.ja;
+    const enArr=it.options.en||it.options.ja;
+    const jaArr=it.options.ja;
+    // 両言語の値を "/" 結合で保存
+    it.value = jaArr[dOptIdx]+'/'+enArr[dOptIdx];
+    addLog('set','✓ SET',`${ilabel(it)} = ${arr[dOptIdx]}`);
+    /* メイン記録形式 (m1_3) が変更されたときは、動画記録サイズの選択値を整合させる */
+    if (it.id === 'm1_3') {
+      reconcileAfterMainRecChange();
+      /* m1_1 の mrData も新しい MRW 状態に同期する (メニュー行のアイコン3連表示用)。
+         ランタイムデータは DEF (SAMPLE のディープコピー) を使う */
+      const m1_1 = (DEF?.movie?.tabs?.[0]?.pages?.[0]?.items || []).find(x => x.id === 'm1_1');
+      if (m1_1 && m1_1.mrData) {
+        const r = mrRes();
+        const fps = mrCurrentFps();
+        const comp = mrCurrentComp();
+        m1_1.mrData = { resId: r.id, fps, compIconId: comp ? comp.iconId : 'std_lgop' };
+      }
+    }
+  }
+  closeDialog(); render();
+}
+
+function closeDialog(){ inDialog=false; removeDialog(); addLog('back','CLOSE',L('close')); }
+
+
+/* ── ダイアログ ── */
+function openDialog(item) {
+  if(item.type==='display'){addLog('enter','DISP',`${ilabel(item)}: ${ivalue(item)}`);showInfo(item);return;}
+  /* ── 動画記録サイズ専用ウィザード ── */
+  if(item.type==='action' && item.id==='m1_1'){
+    addLog('enter','🎬 REC',ilabel(item));
+    showMovieRecWizard(item); inDialog=true; return;
+  }
+  /* ── タイムラプス動画専用ウィザード ── */
+  if(item.type==='action' && item.id==='m6_2'){
+    addLog('enter','⏱ TL',ilabel(item));
+    showTimelapsWizard(); inDialog=true; return;
+  }
+  if(item.type==='action'){addLog('enter','ACT',ilabel(item));showInfo(item,L('action_note'));return;}
+  if(item.options){
+    const arr=item.options[lang]||item.options.ja;
+    dOptIdx=arr.indexOf(ivalue(item)); if(dOptIdx<0)dOptIdx=0;
+    showSelect(item); inDialog=true; addLog('enter','OPEN',ilabel(item));
+  }
+}
+
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  SECTION 6: WIZARD — MOVIE REC SIZE                           ║
+   ║  動画記録サイズ設定ウィザード (MRW / mrXxx)                                ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+/* ── 動画記録サイズ ウィザード（新設計） / EOS R5 Mark II 実機準拠レイアウト: / ① タイトル行 / ② 現在値プレビュー（アイコン3つ 大サイズ） / ③ タブ行（解像度 / フレームレート / 圧縮方式） / ④ タブ内アイコングリッド（自由に行き来可能） / ⑤ ステータス行 ── */
+
+/* ── 状態 ── */
+const MRW = {
+  tab:     0,      /* 0=解像度 1=fps 2=圧縮方式 */
+  resIdx:  11,     /* デフォルト: Full HD (FHD) */
+  fpsIdx:  2,      /* デフォルト: 29.97 (cinematic 23.98/24.00 → normal 29.97 が3番目) */
+  compIdx: 2,      /* デフォルト: 標準 Long GOP (FHDの圧縮方式リスト3番目) */
+  /* グリッドカーソル（各タブ内の行・列） */
+  gridRow: 1,      /* FHD は2行目 */
+  gridCol: 5,      /* FHD は最右列 */
+};
+
+/* ── 解像度定義 ── */
+const MR_RES = [
+  { id:'raw',    ja:'RAW',      en:'RAW',      sub:'8192×4320  17:9', note:'CRM 12bit' },
+  { id:'sraw',   ja:'SRAW',     en:'SRAW',     sub:'4096×2160  17:9', note:'CRM 12bit' },
+  { id:'8kd',    ja:'8K-D',     en:'8K-D',     sub:'8192×4320  17:9', note:'XF-HEVC S' },
+  { id:'8ku',    ja:'8K-U',     en:'8K-U',     sub:'7680×4320  16:9', note:'XF-HEVC S' },
+  { id:'4kd_f',  ja:'4K-D Fine',en:'4K-D Fine',sub:'4096×2160  17:9', note:'8K oversample' },
+  { id:'4kd',    ja:'4K-D',     en:'4K-D',     sub:'4096×2160  17:9', note:'' },
+  { id:'4ku_f',  ja:'4K-U Fine',en:'4K-U Fine',sub:'3840×2160  16:9', note:'8K oversample' },
+  { id:'4ku',    ja:'4K-U',     en:'4K-U',     sub:'3840×2160  16:9', note:'' },
+  { id:'2kd_f',  ja:'2K-D Fine',en:'2K-D Fine',sub:'2048×1080  17:9', note:'4K oversample' },
+  { id:'2kd',    ja:'2K-D',     en:'2K-D',     sub:'2048×1080  17:9', note:'' },
+  { id:'fhd_f',  ja:'FHD Fine', en:'FHD Fine', sub:'1920×1080  16:9', note:'4K oversample' },
+  { id:'fhd',    ja:'Full HD',  en:'Full HD',  sub:'1920×1080  16:9', note:'' },
+];
+
+/* 解像度グリッド定義（実機の画面配置に準拠、2列）*/
+const MR_RES_GRID = [
+  ['raw',   'sraw',  '8kd',   '8ku',   '4kd_f', '4kd'  ],
+  ['4ku_f', '4ku',   '2kd_f', '2kd',   'fhd_f', 'fhd'  ],
+];
+
+/* 解像度ごとの利用可能fps */
+const MR_FPS = {
+  raw:    { cinematic:['23.98','24.00'], normal:['29.97'] },
+  sraw:   { cinematic:['23.98','24.00'], normal:['29.97','59.94'] },
+  '8kd':  { cinematic:['23.98','24.00'], normal:['29.97'] },
+  '8ku':  { cinematic:['23.98'],         normal:['29.97'] },
+  '4kd_f':{ cinematic:['23.98','24.00'], normal:['29.97'] },
+  '4kd':  { cinematic:['23.98','24.00'], normal:['29.97','59.94'], highspeed:['119.88'] },
+  '4ku_f':{ cinematic:['23.98','24.00'], normal:['29.97'] },
+  '4ku':  { cinematic:['23.98'],         normal:['29.97','59.94'], highspeed:['119.88'] },
+  '2kd_f':{ cinematic:['23.98','24.00'], normal:['29.97','59.94'] },
+  '2kd':  { cinematic:['23.98','24.00'], normal:['29.97','59.94'], highspeed:['119.88','239.76'] },
+  'fhd_f':{ cinematic:['23.98','24.00'], normal:['29.97','59.94'] },
+  'fhd':  { cinematic:['23.98','24.00'], normal:['29.97','59.94'], highspeed:['119.88','239.76'] },
+};
+
+/* 解像度ごとの圧縮方式 */
+const MR_COMP = {
+  raw:    [
+    { ja:'RAW（標準）',   en:'RAW (Standard)',        meta:'CRM 12bit', mbps:'~2600 Mbps', iconId:'raw_std'  },
+    { ja:'RAW（軽量）',   en:'RAW (Light)',            meta:'CRM 12bit', mbps:'~1700 Mbps', iconId:'raw_lite' },
+  ],
+  sraw:   [
+    { ja:'RAW（標準）',   en:'RAW (Standard)',        meta:'CRM 12bit', mbps:'~930 Mbps',  iconId:'raw_std'  },
+    { ja:'RAW（軽量）',   en:'RAW (Light)',            meta:'CRM 12bit', mbps:'~420 Mbps',  iconId:'raw_lite' },
+  ],
+  '8kd':  [
+    { ja:'高画質イントラ',en:'High (Intra)',           meta:'XF-HEVC S YCC422 10bit', mbps:'~1920 Mbps', iconId:'hi_intra' },
+    { ja:'標準イントラ',  en:'Std (Intra)',            meta:'XF-HEVC S YCC422 10bit', mbps:'~1500 Mbps', iconId:'std_intra'},
+    { ja:'軽量イントラ',  en:'Light (Intra)',          meta:'XF-HEVC S YCC422 10bit', mbps:'~1000 Mbps', iconId:'lt_intra' },
+    { ja:'標準 Long GOP (422)', en:'Std Long GOP 422', meta:'XF-HEVC S YCC422 10bit', mbps:'~540 Mbps',  iconId:'std_lgop' },
+    { ja:'標準 Long GOP (420)', en:'Std Long GOP 420', meta:'XF-HEVC S YCC420 10bit', mbps:'~400 Mbps',  iconId:'lt_lgop'  },
+  ],
+  '8ku':  [
+    { ja:'標準イントラ',  en:'Std (Intra)',            meta:'XF-HEVC S YCC422 10bit', mbps:'~1500 Mbps', iconId:'std_intra'},
+    { ja:'軽量イントラ',  en:'Light (Intra)',          meta:'XF-HEVC S YCC422 10bit', mbps:'~1000 Mbps', iconId:'lt_intra' },
+    { ja:'標準 Long GOP (422)', en:'Std Long GOP 422', meta:'XF-HEVC S YCC422 10bit', mbps:'~540 Mbps',  iconId:'std_lgop' },
+    { ja:'標準 Long GOP (420)', en:'Std Long GOP 420', meta:'XF-HEVC S YCC420 10bit', mbps:'~400 Mbps',  iconId:'lt_lgop'  },
+  ],
+  '4kd_f':[
+    { ja:'高画質イントラ',en:'High (Intra)',           meta:'XF-HEVC S YCC422 10bit', mbps:'~500 Mbps',  iconId:'hi_intra' },
+    { ja:'標準イントラ',  en:'Std (Intra)',            meta:'XF-HEVC S YCC422 10bit', mbps:'~375 Mbps',  iconId:'std_intra'},
+    { ja:'軽量イントラ',  en:'Light (Intra)',          meta:'XF-HEVC S YCC422 10bit', mbps:'~250 Mbps',  iconId:'lt_intra' },
+    { ja:'標準 Long GOP (422)', en:'Std Long GOP 422', meta:'XF-HEVC S YCC422 10bit', mbps:'~135 Mbps',  iconId:'std_lgop' },
+    { ja:'標準 Long GOP (420)', en:'Std Long GOP 420', meta:'XF-HEVC/AVC YCC420',     mbps:'~100 Mbps',  iconId:'lt_lgop'  },
+  ],
+  '4kd':  [
+    { ja:'高画質イントラ',en:'High (Intra)',           meta:'XF-AVC S YCC422 10bit',  mbps:'~1000 Mbps', iconId:'hi_intra' },
+    { ja:'標準イントラ',  en:'Std (Intra)',            meta:'XF-AVC S YCC422 10bit',  mbps:'~750 Mbps',  iconId:'std_intra'},
+    { ja:'軽量イントラ',  en:'Light (Intra)',          meta:'XF-AVC S YCC422 10bit',  mbps:'~500 Mbps',  iconId:'lt_intra' },
+    { ja:'標準 Long GOP (422)', en:'Std Long GOP 422', meta:'XF-HEVC S YCC422 10bit', mbps:'~450 Mbps',  iconId:'std_lgop' },
+    { ja:'標準 Long GOP (420)', en:'Std Long GOP 420', meta:'XF-HEVC/AVC YCC420',     mbps:'~300 Mbps',  iconId:'lt_lgop'  },
+  ],
+  '4ku_f':[
+    { ja:'高画質イントラ',en:'High (Intra)',           meta:'XF-HEVC S YCC422 10bit', mbps:'~500 Mbps',  iconId:'hi_intra' },
+    { ja:'標準イントラ',  en:'Std (Intra)',            meta:'XF-HEVC S YCC422 10bit', mbps:'~375 Mbps',  iconId:'std_intra'},
+    { ja:'軽量イントラ',  en:'Light (Intra)',          meta:'XF-HEVC S YCC422 10bit', mbps:'~250 Mbps',  iconId:'lt_intra' },
+    { ja:'標準 Long GOP (422)', en:'Std Long GOP 422', meta:'XF-HEVC S YCC422 10bit', mbps:'~135 Mbps',  iconId:'std_lgop' },
+    { ja:'標準 Long GOP (420)', en:'Std Long GOP 420', meta:'XF-HEVC/AVC YCC420',     mbps:'~100 Mbps',  iconId:'lt_lgop'  },
+  ],
+  '4ku':  [
+    { ja:'高画質イントラ',en:'High (Intra)',           meta:'XF-AVC S YCC422 10bit',  mbps:'~1000 Mbps', iconId:'hi_intra' },
+    { ja:'標準イントラ',  en:'Std (Intra)',            meta:'XF-AVC S YCC422 10bit',  mbps:'~750 Mbps',  iconId:'std_intra'},
+    { ja:'軽量イントラ',  en:'Light (Intra)',          meta:'XF-AVC S YCC422 10bit',  mbps:'~500 Mbps',  iconId:'lt_intra' },
+    { ja:'標準 Long GOP (422)', en:'Std Long GOP 422', meta:'XF-HEVC S YCC422 10bit', mbps:'~450 Mbps',  iconId:'std_lgop' },
+    { ja:'標準 Long GOP (420)', en:'Std Long GOP 420', meta:'XF-HEVC/AVC YCC420',     mbps:'~300 Mbps',  iconId:'lt_lgop'  },
+  ],
+  '2kd_f':[
+    { ja:'標準 Long GOP (422)', en:'Std Long GOP 422', meta:'XF-HEVC S YCC422 10bit', mbps:'~50 Mbps',   iconId:'std_lgop' },
+    { ja:'標準 Long GOP (420)', en:'Std Long GOP 420', meta:'XF-HEVC/AVC YCC420',     mbps:'~35 Mbps',   iconId:'lt_lgop'  },
+  ],
+  '2kd':  [
+    { ja:'高画質イントラ',en:'High (Intra)',           meta:'XF-AVC S YCC422 10bit',  mbps:'~500 Mbps',  iconId:'hi_intra' },
+    { ja:'標準イントラ',  en:'Std (Intra)',            meta:'XF-AVC S YCC422 10bit',  mbps:'~250 Mbps',  iconId:'std_intra'},
+    { ja:'標準 Long GOP H (422)',en:'Std Long GOP H 422',meta:'XF-HEVC S YCC422 10bit',mbps:'~200 Mbps', iconId:'std_lgop' },
+    { ja:'標準 Long GOP H (420)',en:'Std Long GOP H 420',meta:'XF-HEVC/AVC YCC420',   mbps:'~140 Mbps',  iconId:'lt_lgop'  },
+    { ja:'標準 Long GOP (422)', en:'Std Long GOP 422', meta:'XF-AVC S YCC422 10bit',  mbps:'~50 Mbps',   iconId:'std_lgop' },
+  ],
+  'fhd_f':[
+    { ja:'標準 Long GOP (422)', en:'Std Long GOP 422', meta:'XF-HEVC S YCC422 10bit', mbps:'~50 Mbps',   iconId:'std_lgop' },
+    { ja:'標準 Long GOP (420)', en:'Std Long GOP 420', meta:'XF-HEVC/AVC YCC420',     mbps:'~35 Mbps',   iconId:'lt_lgop'  },
+  ],
+  'fhd':  [
+    { ja:'高画質イントラ',en:'High (Intra)',           meta:'XF-AVC S YCC422 10bit',  mbps:'~360 Mbps',  iconId:'hi_intra' },
+    { ja:'軽量イントラ',  en:'Light (Intra)',          meta:'XF-AVC S YCC422 10bit',  mbps:'~180 Mbps',  iconId:'lt_intra' },
+    { ja:'標準 Long GOP H (422)',en:'Std Long GOP H 422',meta:'XF-HEVC S YCC422 10bit',mbps:'~200 Mbps', iconId:'std_lgop' },
+    { ja:'標準 Long GOP H (420)',en:'Std Long GOP H 420',meta:'XF-HEVC/AVC YCC420',   mbps:'~140 Mbps',  iconId:'lt_lgop'  },
+    { ja:'標準 Long GOP (422)', en:'Std Long GOP 422', meta:'XF-AVC S YCC422 10bit',  mbps:'~60 Mbps',   iconId:'std_lgop' },
+    { ja:'軽量 Long GOP',       en:'Light Long GOP',   meta:'XF-AVC S YCC422 10bit',  mbps:'~35 Mbps',   iconId:'lt_lgop'  },
+  ],
+};
+
+const MR_WARN = {
+  raw:    { ja:'CFexpress Type B必須。RAW動画はDPPで現像。',         en:'CFexpress Type B required. Process in DPP.' },
+  sraw:   { ja:'CFexpress Type B必須。4K RAW動画。',                 en:'CFexpress Type B required. 4K RAW.' },
+  '8kd':  { ja:'CFexpress Type B必須。HFR/クロップ不可。',           en:'CFexpress Type B req. HFR/Crop disabled.' },
+  '8ku':  { ja:'CFexpress Type B必須。HFR/クロップ不可。',           en:'CFexpress Type B req. HFR/Crop disabled.' },
+  '4kd_f':{ ja:'8Kオーバーサンプル。HFR/クロップ不可。',             en:'8K oversample. HFR/Crop disabled.' },
+  '4ku_f':{ ja:'8Kオーバーサンプル。HFR/クロップ不可。',             en:'8K oversample. HFR/Crop disabled.' },
+};
+
+/* ── ヘルパー ── */
+function mrRes()    { return MR_RES[MRW.resIdx]; }
+function mrFpsMap() {
+  const m = MR_FPS[mrRes().id] || {};
+  const out = {};
+  ['cinematic','normal','highspeed'].forEach(k=>{ if(m[k]) out[k]=m[k]; });
+  return out;
+}
+function mrFpsAll() { return ['cinematic','normal','highspeed'].flatMap(k=>mrFpsMap()[k]||[]); }
+function mrComps()  { return MR_COMP[mrRes().id] || []; }
+function mrCurrentFps() {
+  const all = mrFpsAll();
+  return all[Math.min(MRW.fpsIdx, all.length-1)] || all[0] || '29.97';
+}
+function mrCurrentComp() { return mrComps()[Math.min(MRW.compIdx, mrComps().length-1)]; }
+function mrCompLabel(c) { return lang==='ja' ? c.ja : c.en; }
+
+/* ──────────────────────────────────────────────────────────────────
+   排他制御 (実機マニュアル UG-03_Shooting-2_0040.html 準拠)
+
+   メイン記録形式 (m1_3) の現在値によって、選択可能な解像度と圧縮方式が決まる。
+   実装方針:
+     - 選択不可セルはグリッドに表示するが「無効」状態にして灰色化
+     - キー操作でカーソル移動は可能だが、Enter/SET は拒否
+     - メイン記録形式が変更されると、現在の選択が無効化された場合に自動補正
+   ────────────────────────────────────────────────────────────────── */
+
+/* m1_3 の現在値 (日本語側) を取得。"XF-AVC S YCC420 8bit/XF-AVC S YCC420 8bit" → "XF-AVC S YCC420 8bit" */
+function getMainRecFormat() {
+  /* 動画モードのページ1を直接探索。ランタイムは DEF (SAMPLE のディープコピー) を使う */
+  try {
+    const tabs = DEF?.movie?.tabs || [];
+    for (const tab of tabs) {
+      for (const page of (tab.pages || [])) {
+        for (const it of (page.items || [])) {
+          if (it.id === 'm1_3') {
+            return (it.value || '').split('/')[0] || 'XF-AVC S YCC420 8bit';
+          }
+        }
+      }
+    }
+  } catch (e) {}
+  return 'XF-AVC S YCC420 8bit';
+}
+
+/* メイン記録形式が RAW 系か (= 解像度は raw/sraw のみ) */
+function isMainRecRaw() { return getMainRecFormat() === 'RAW'; }
+
+/* メイン記録形式が XF-HEVC S 系か (= 8K-D/8K-U が選択可能) */
+function isMainRecHevcS() {
+  const f = getMainRecFormat();
+  return f === 'XF-HEVC S YCC422 10bit' || f === 'XF-HEVC S YCC420 10bit';
+}
+
+/* メイン記録形式が XF-AVC S YCC422 10bit か (= 高画質/標準/軽量イントラ系が無条件で選択可能) */
+function isMainRecAvc422_10() { return getMainRecFormat() === 'XF-AVC S YCC422 10bit'; }
+
+/* 解像度 id がメイン記録形式と組み合わせて有効か */
+function isResEnabled(resId) {
+  const isRaw = (resId === 'raw' || resId === 'sraw');
+  if (isMainRecRaw()) return isRaw;             /* RAWモード時は raw/sraw のみ */
+  if (isRaw) return false;                       /* RAW以外モード時は raw/sraw 不可 */
+  if (resId === '8kd' || resId === '8ku') return isMainRecHevcS();  /* 8K は HEVC S のみ */
+  return true;                                   /* 他の解像度は基本OK */
+}
+
+/* 圧縮方式 (MR_COMP の要素) がメイン記録形式と現在の解像度の組み合わせで有効か */
+function isCompEnabled(comp, resId) {
+  const iconId = comp.iconId;
+  /* RAW系圧縮方式は解像度が raw/sraw のときだけ */
+  if (iconId === 'raw_std' || iconId === 'raw_lite') return (resId === 'raw' || resId === 'sraw');
+  /* RAW以外の圧縮方式は raw/sraw のときは出ない */
+  if (resId === 'raw' || resId === 'sraw') return false;
+
+  const is8K = (resId === '8kd' || resId === '8ku');
+
+  /* 高画質イントラ: メイン記録形式 = XF-AVC S YCC422 10bit のときのみ */
+  if (iconId === 'hi_intra') return isMainRecAvc422_10();
+  /* 標準/軽量イントラ: 解像度が 8K-D/8K-U または メイン記録形式 = XF-AVC S YCC422 10bit */
+  if (iconId === 'std_intra' || iconId === 'lt_intra') {
+    return is8K || isMainRecAvc422_10();
+  }
+  /* Long GOP は基本どこでも OK */
+  return true;
+}
+
+/* メイン記録形式変更時の補正:
+     現在の解像度や圧縮方式が無効になった場合に、最初の有効値へ自動切替 */
+function reconcileAfterMainRecChange() {
+  /* (1) 解像度が無効なら、有効な先頭の解像度に切り替え */
+  if (!isResEnabled(mrRes().id)) {
+    const firstValid = MR_RES.findIndex(r => isResEnabled(r.id));
+    if (firstValid >= 0) {
+      MRW.resIdx = firstValid;
+      /* グリッド位置も同期 */
+      const targetId = MR_RES[firstValid].id;
+      for (let row=0; row<MR_RES_GRID.length; row++) {
+        const col = MR_RES_GRID[row].indexOf(targetId);
+        if (col >= 0) { MRW.gridRow=row; MRW.gridCol=col; break; }
+      }
+    }
+  }
+  /* (2) 圧縮方式インデックスが範囲外なら最初の有効値へ */
+  const comps = mrComps();
+  const curResId = mrRes().id;
+  const cur = comps[MRW.compIdx];
+  if (!cur || !isCompEnabled(cur, curResId)) {
+    const firstValid = comps.findIndex(c => isCompEnabled(c, curResId));
+    MRW.compIdx = firstValid >= 0 ? firstValid : 0;
+  }
+  /* (3) fps インデックスも範囲外ならクランプ (mrCurrentFps が Math.min してくれるので最低限ここで0に戻す程度) */
+  const fpsList = mrFpsAll();
+  if (MRW.fpsIdx >= fpsList.length) MRW.fpsIdx = 0;
+}
+
+/* ── SVGアイコン：解像度（大） ── */
+/* ── SVGアイコン：解像度（大・ウィザード用）
+       実機準拠のフィルム枠デザイン:
+         - 上辺＋右上の縦線（開いた枠）
+         - 左側にフィルム穴（パーフォレーション）3つ
+         - 中央テキスト：通常版は1段（解像度名のみ）、Fine版は2段（解像度名 + Fine）
+       色は currentColor を使わずパラメータ c で受け取る ── */
+function mrIconRes(id, c) {
+  const cfg = {
+    raw:    {label:'RAW',  fine:false},
+    sraw:   {label:'SRAW', fine:false},
+    '8kd':  {label:'8K-D', fine:false},
+    '8ku':  {label:'8K-U', fine:false},
+    '4kd_f':{label:'4K-D', fine:true },
+    '4kd':  {label:'4K-D', fine:false},
+    '4ku_f':{label:'4K-U', fine:true },
+    '4ku':  {label:'4K-U', fine:false},
+    '2kd_f':{label:'2K-D', fine:true },
+    '2kd':  {label:'2K-D', fine:false},
+    'fhd_f':{label:'FHD',  fine:true },
+    'fhd':  {label:'FHD',  fine:false},
+  }[id]||{label:'?',fine:false};
+  /* テキストサイズ：4文字のSRAWは少し小さく */
+  const fs1 = cfg.fine
+    ? (cfg.label==='SRAW' ? 9  : cfg.label==='FHD' ? 9.5 : 10)
+    : (cfg.label==='SRAW' ? 11 : cfg.label==='FHD' ? 12  : 13);
+  const fs2 = 6.5;
+  const frame = `
+    <path d="M2 3 L54 3 L54 9" stroke="${c}" stroke-width="1.5" fill="none" stroke-linecap="square"/>
+    <rect x="3" y="5"  width="2.4" height="3" fill="${c}"/>
+    <rect x="3" y="11" width="2.4" height="3" fill="${c}"/>
+    <rect x="3" y="17" width="2.4" height="3" fill="${c}"/>`;
+  const text = cfg.fine
+    ? `<text x="32" y="14" text-anchor="middle" font-size="${fs1}" font-weight="700" font-family="Arial,sans-serif" fill="${c}">${cfg.label}</text>
+       <text x="32" y="24" text-anchor="middle" font-size="${fs2}" font-weight="600" font-family="Arial,sans-serif" fill="${c}">Fine</text>`
+    : `<text x="32" y="22" text-anchor="middle" font-size="${fs1}" font-weight="700" font-family="Arial,sans-serif" fill="${c}">${cfg.label}</text>`;
+  return `<svg viewBox="0 0 56 32" width="56" height="32" xmlns="http://www.w3.org/2000/svg">${frame}${text}</svg>`;
+}
+
+/* ── SVGアイコン：fps（大・ウィザード用）
+       実機準拠の白地黒文字ピル型ラベル:
+         - 角丸矩形 (rx=3, viewBox 56×22) を白で塗り
+         - 中央に「XX.XXP」形式の文字 (整数部・小数部・P すべて同サイズ・同ウェイト)
+       色引数 c は使用しない (常に白地黒文字。状態表現は呼び出し側の枠線で行う) ── */
+function mrIconFps(fps, c) {
+  const p=fps.split('.'), intPart=p[0], frac=p[1]||'00';
+  const label = `${intPart}.${frac}P`;
+  return `<svg viewBox="0 0 56 22" width="56" height="22" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="56" height="22" rx="3" fill="#fff"/>
+    <text x="28" y="16.5" text-anchor="middle" font-size="14" font-weight="700" font-family="Arial,sans-serif" fill="#000">${label}</text>
+  </svg>`;
+}
+
+/* ── SVGアイコン：圧縮方式（大・ウィザード用）
+       実機準拠デザイン:
+         - ベース: 白地黒文字の角丸矩形ラベル (Intra / LGOP / RAW)
+         - 標準版: ラベル単独・中央配置
+         - 高画質(↑)版: ラベル左寄せ + 右に「白塗り箱 + 上向き矢印が突き出る」
+         - 軽量(↓)版: ラベル左寄せ + 右に「破線輪郭(大) + ↓矢印 + 内側下部に実線塗り箱(小)」
+       7種iconId: hi_intra / std_intra / lt_intra / std_lgop / lt_lgop / raw_std / raw_lite
+       色引数 c は使用しない (常に白基調。状態表現は呼び出し側の枠線で行う) ── */
+function mrIconComp(iconId, c) {
+  /* iconId → ラベル文字 + 修飾種別 (none/up/down) のマッピング */
+  const cfg = {
+    hi_intra:  { label:'Intra', mod:'up'   },
+    std_intra: { label:'Intra', mod:'none' },
+    lt_intra:  { label:'Intra', mod:'down' },
+    std_lgop:  { label:'LGOP',  mod:'none' },
+    lt_lgop:   { label:'LGOP',  mod:'down' },
+    raw_std:   { label:'RAW',   mod:'none' },
+    raw_lite:  { label:'RAW',   mod:'down' },
+  }[iconId] || { label:'?', mod:'none' };
+
+  /* ラベル矩形の位置: 修飾なしは中央、修飾ありは左寄せ */
+  const labelX = cfg.mod==='none' ? 11 : 0;
+  const textX  = labelX + 17;
+
+  const labelRect = `<rect x="${labelX}" y="2" width="34" height="18" rx="1" fill="#fff"/>
+    <text x="${textX}" y="15.5" text-anchor="middle" font-size="10" font-weight="700" font-family="Arial,sans-serif" fill="#000">${cfg.label}</text>`;
+
+  let modifier = '';
+  if (cfg.mod === 'up') {
+    /* 高画質: 白塗り箱(下) + 上向き矢印が箱から突き出る */
+    modifier = `
+      <rect x="38" y="13" width="16" height="7" fill="#fff"/>
+      <path d="M46 12 L46 4 M42 8 L46 4 L50 8" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  } else if (cfg.mod === 'down') {
+    /* 軽量: 破線輪郭(大) + ↓矢印 + 内側下部に実線塗り箱(小) */
+    modifier = `
+      <rect x="38" y="3" width="16" height="17" stroke="#fff" stroke-width="1" stroke-dasharray="1.5 1.2" fill="none"/>
+      <path d="M46 5 L46 12 M43 9.5 L46 12.5 L49 9.5" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="41" y="14.5" width="10" height="5" fill="#fff"/>`;
+  }
+
+  return `<svg viewBox="0 0 56 22" width="56" height="22" xmlns="http://www.w3.org/2000/svg">${labelRect}${modifier}</svg>`;
+}
+
+/* ── SVGアイコン：解像度（小・メニュー行用 / viewBox 40×24） ── */
+function mrIconResSmall(id, c) {
+  const cfg = {
+    raw:    {label:'RAW',  fine:false},
+    sraw:   {label:'SRAW', fine:false},
+    '8kd':  {label:'8K-D', fine:false},
+    '8ku':  {label:'8K-U', fine:false},
+    '4kd_f':{label:'4K-D', fine:true },
+    '4kd':  {label:'4K-D', fine:false},
+    '4ku_f':{label:'4K-U', fine:true },
+    '4ku':  {label:'4K-U', fine:false},
+    '2kd_f':{label:'2K-D', fine:true },
+    '2kd':  {label:'2K-D', fine:false},
+    'fhd_f':{label:'FHD',  fine:true },
+    'fhd':  {label:'FHD',  fine:false},
+  }[id]||{label:'?',fine:false};
+  const fs1 = cfg.fine
+    ? (cfg.label==='SRAW' ? 6.5 : cfg.label==='FHD' ? 7   : 7.5)
+    : (cfg.label==='SRAW' ? 8.5 : cfg.label==='FHD' ? 9   : 9.5);
+  const fs2 = 5;
+  const frame = `
+    <path d="M1.5 2 L38.5 2 L38.5 6" stroke="${c}" stroke-width="1.2" fill="none" stroke-linecap="square"/>
+    <rect x="2.5" y="3.5"  width="2" height="2.2" fill="${c}"/>
+    <rect x="2.5" y="8"    width="2" height="2.2" fill="${c}"/>
+    <rect x="2.5" y="12.5" width="2" height="2.2" fill="${c}"/>`;
+  const text = cfg.fine
+    ? `<text x="22" y="11" text-anchor="middle" font-size="${fs1}" font-weight="700" font-family="Arial,sans-serif" fill="${c}">${cfg.label}</text>
+       <text x="22" y="18" text-anchor="middle" font-size="${fs2}" font-weight="600" font-family="Arial,sans-serif" fill="${c}">Fine</text>`
+    : `<text x="22" y="16" text-anchor="middle" font-size="${fs1}" font-weight="700" font-family="Arial,sans-serif" fill="${c}">${cfg.label}</text>`;
+  return `<svg viewBox="0 0 40 24" width="100%" height="24" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">${frame}${text}</svg>`;
+}
+/* ── SVGアイコン：fps（小・メニュー行用）
+       大サイズと同じ意匠 (白地黒文字ピル型)、viewBox 40×16 ── */
+function mrIconFpsSmall(fps, c) {
+  const p=fps.split('.'), intPart=p[0], frac=p[1]||'00';
+  const label = `${intPart}.${frac}P`;
+  return `<svg viewBox="0 0 40 16" width="100%" height="16" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="40" height="16" rx="2" fill="#fff"/>
+    <text x="20" y="12" text-anchor="middle" font-size="10" font-weight="700" font-family="Arial,sans-serif" fill="#000">${label}</text>
+  </svg>`;
+}
+/* ── SVGアイコン：圧縮方式（小・メニュー行用）
+       大サイズ (mrIconComp) と同じ意匠・同じ viewBox を使い、width=100% で縮小表示 ── */
+function mrIconCompSmall(iconId, c) {
+  return mrIconComp(iconId, c).replace('width="56" height="22"','width="100%" height="16" preserveAspectRatio="xMidYMid meet"');
+}
+function getCompIconId(name) { return name||'std_intra'; }
+
+/* ── ウィザード 表示・描画 ── */
+function showMovieRecWizard() {
+  removeDialog();
+  /* メニュー側の現在値 (mrData) から MRW 状態を復元。
+     これによりメニューを再度開いた時に最後の選択状態がウィザードに反映される */
+  const m1_1 = currentItem();
+  if (m1_1 && m1_1.mrData) {
+    const md = m1_1.mrData;
+    const ri = MR_RES.findIndex(r=>r.id===md.resId);
+    if (ri>=0) {
+      MRW.resIdx = ri;
+      /* グリッドカーソル位置も同期 */
+      for (let row=0; row<MR_RES_GRID.length; row++) {
+        const col = MR_RES_GRID[row].indexOf(md.resId);
+        if (col>=0) { MRW.gridRow=row; MRW.gridCol=col; break; }
+      }
+    }
+    /* fps インデックス */
+    const fpsList = mrFpsAll();
+    const fi = fpsList.indexOf(md.fps);
+    if (fi>=0) MRW.fpsIdx = fi;
+    /* 圧縮方式インデックス */
+    const comps = mrComps();
+    const ci = comps.findIndex(c=>c.iconId===md.compIconId);
+    if (ci>=0) MRW.compIdx = ci;
+  }
+  /* メイン記録形式と現在の選択値が非互換になっている場合は自動補正 */
+  reconcileAfterMainRecChange();
+  const ov=document.createElement('div');
+  ov.id='mrWiz';
+  ov.style.cssText='position:absolute;inset:0;background:#040810;z-index:200;display:flex;flex-direction:column;overflow:hidden;font-family:var(--font-mono);padding-left:8px;';
+  $('lcd').appendChild(ov);
+  mrRenderAll();
+}
+
+function mrRenderAll() {
+  const ov=$('mrWiz'); if(!ov) return;
+  ov.innerHTML='';
+
+  const fps=mrCurrentFps(), comp=mrCurrentComp(), r=mrRes();
+  const C_AC='#e05040';
+
+  /* ━━━ ① タイトル行 ━━━ */
+  const titleRow=document.createElement('div');
+  titleRow.style.cssText='display:flex;align-items:center;'
+    +'padding:5px 8px 5px 0;margin-left:-8px;padding-left:8px;'
+    +'background:#030608;border-bottom:2px solid #e05040;flex-shrink:0;';
+  const tL=document.createElement('span');
+  tL.style.cssText='font-size:12px;font-weight:bold;color:#ffffff;letter-spacing:.06em;';
+  tL.textContent=lang==='ja'?'動画記録サイズ':'Movie rec. size';
+  titleRow.appendChild(tL);
+  ov.appendChild(titleRow);
+
+  /* ━━━ ② 現在値 2行表示（固定高さ・白文字・グレー背景） ━━━ */
+  const valBlock=document.createElement('div');
+  valBlock.style.cssText='display:flex;flex-direction:column;justify-content:center;gap:4px;'
+    +'padding:6px 8px 6px 0;margin-left:-8px;padding-left:8px;'
+    +'min-height:58px;background:#2a3540;'
+    +'border-bottom:1px solid #0f1e2a;flex-shrink:0;box-sizing:border-box;';
+
+  const val1=document.createElement('div');
+  val1.style.cssText='display:flex;align-items:baseline;gap:12px;min-height:20px;';
+  const resText=document.createElement('span');
+  resText.style.cssText='font-size:13px;font-weight:bold;color:#ffffff;font-family:var(--font-mono);white-space:nowrap;';
+  resText.textContent=(lang==='ja'?r.ja:r.en)+'  '+r.sub.split('  ')[1];
+  const fpsText=document.createElement('span');
+  fpsText.style.cssText='font-size:13px;font-weight:bold;color:#ffffff;font-family:var(--font-mono);white-space:nowrap;';
+  fpsText.textContent=fps+' fps';
+  val1.appendChild(resText); val1.appendChild(fpsText);
+  valBlock.appendChild(val1);
+
+  const val2=document.createElement('div');
+  val2.style.cssText='display:flex;align-items:baseline;gap:10px;min-height:18px;';
+  const compText=document.createElement('span');
+  compText.style.cssText='font-size:11px;color:#ffffff;font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+  compText.textContent=comp?mrCompLabel(comp):'—';
+  const mbpsText=document.createElement('span');
+  mbpsText.style.cssText='font-size:9px;color:#b0c0cc;font-family:var(--font-mono);white-space:nowrap;flex-shrink:0;';
+  mbpsText.textContent=comp?comp.mbps:'';
+  val2.appendChild(compText); val2.appendChild(mbpsText);
+  valBlock.appendChild(val2);
+  ov.appendChild(valBlock);
+
+  /* ━━━ ③ タブ行（現在の選択値をSVGアイコンで表示） ━━━ */
+  const tabRow=document.createElement('div');
+  tabRow.style.cssText='display:flex;align-items:stretch;height:32px;'
+    +'background:#050810;border-bottom:1px solid #0f1e2a;flex-shrink:0;'
+    +'gap:14px;margin-left:-8px;padding:4px 0 0 8px;';
+  /* 各タブのSVGアイコン (現在選択されている値) */
+  const tabIconHTML = [
+    /* 解像度: viewBox 56×32 → 高さ 24px に縮小 */
+    mrIconRes(r.id,'#fff').replace('width="56" height="32"','width="42" height="24"'),
+    /* fps: viewBox 56×22 → 高さ 22px */
+    mrIconFps(fps,'#fff').replace('width="56" height="22"','width="50" height="22"'),
+    /* 圧縮方式: viewBox 56×22 → 高さ 22px (compが無い場合は空) */
+    comp ? mrIconComp(comp.iconId,'#fff').replace('width="56" height="22"','width="50" height="22"') : '',
+  ];
+  tabIconHTML.forEach((iconHtml,i)=>{
+    const act=i===MRW.tab;
+    const t=document.createElement('div');
+    t.style.cssText=`display:flex;align-items:center;justify-content:center;padding:0 2px;
+      cursor:pointer;
+      border-bottom:${act?'2px solid '+C_AC:'2px solid transparent'};
+      opacity:${act?1:0.55};
+      transition:opacity .15s;`;
+    t.innerHTML=iconHtml;
+    t.addEventListener('click',()=>{ MRW.tab=i; MRW.gridRow=0; MRW.gridCol=0; mrRenderAll(); });
+    tabRow.appendChild(t);
+  });
+  ov.appendChild(tabRow);
+
+  /* ━━━ ④ コンテンツエリア ━━━ */
+  const content=document.createElement('div');
+  content.style.cssText='flex:1;overflow:hidden;display:flex;flex-direction:column;';
+  if(MRW.tab===0)      mrRenderResGrid(content);
+  else if(MRW.tab===1) mrRenderFpsGrid(content);
+  else                 mrRenderCompList(content);
+  ov.appendChild(content);
+
+  /* ━━━ ⑤ ステータスバー ━━━ */
+  const stat=document.createElement('div');
+  stat.style.cssText=`display:flex;align-items:center;justify-content:space-between;`
+    +'padding:3px 8px 3px 0;margin-left:-8px;padding-left:8px;background:#030608;border-top:1px solid #0f1e2a;flex-shrink:0;';
+  const hint=document.createElement('span');
+  hint.style.cssText='font-size:9px;color:#2a4060;font-family:var(--font-mono);';
+  hint.textContent=lang==='ja'?'↑↓←→:選択  SET:確定  MENU:閉じる':'↑↓←→:Select  SET:OK  MENU:Close';
+  const selEl=document.createElement('span');
+  selEl.style.cssText='font-size:9px;color:#e05040;font-family:var(--font-mono);';
+  if(MRW.tab===0)      selEl.textContent=(lang==='ja'?r.ja:r.en)+' '+r.sub.split('  ')[1];
+  else if(MRW.tab===1) selEl.textContent=fps+' fps';
+  else if(comp)        selEl.textContent=mrCompLabel(comp);
+  stat.appendChild(hint); stat.appendChild(selEl);
+  ov.appendChild(stat);
+}
+
+/* ── 共通グリッドセル高さ定数 ── */
+const MR_CELL_H = 52; /* px：3タブ共通のセル固定高さ */
+const MR_ROW_STYLE = `display:grid;grid-template-columns:repeat(6,1fr);grid-auto-rows:${MR_CELL_H}px;gap:5px;flex-shrink:0;`;
+const MR_CELL_BASE = `height:${MR_CELL_H}px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border-radius:2px;min-width:0;overflow:hidden;`;
+
+/* ── 解像度グリッド（2行×6列） ── */
+function mrRenderResGrid(container) {
+  const inner=document.createElement('div');
+  inner.style.cssText='padding:6px 8px 6px 0;display:flex;flex-direction:column;gap:5px;overflow:hidden;justify-content:flex-start;flex:1;';
+
+  MR_RES_GRID.forEach((row,ri)=>{
+    const rowEl=document.createElement('div');
+    rowEl.style.cssText=MR_ROW_STYLE;
+    row.forEach((resId,ci)=>{
+      const r=MR_RES.find(x=>x.id===resId);
+      const isSelected=MRW.resIdx===MR_RES.indexOf(r);
+      const isCursor=MRW.gridRow===ri&&MRW.gridCol===ci;
+      const isEnabled=isResEnabled(resId);
+      /* アイコン色は fps/comp と同じく2階調 (カーソル時=薄オレンジ、その他=白) に統一。
+         「現在の選択」は枠線+背景で表現し、アイコン色では区別しない。
+         無効セルはグリッドに表示するが opacity を下げて灰色化、Enter/SET は拒否 */
+      const c=isCursor?'#f0a090':'#fff';
+      const cell=document.createElement('div');
+      cell.style.cssText=MR_CELL_BASE
+        +`gap:2px;padding:4px 2px;`
+        +`border:${isCursor?'2px solid #e05040':isSelected?'1px solid #4a6880':'1px solid #1a2a38'};`
+        +`background:${isCursor?'#0e1e2e':isSelected?'#070e18':'transparent'};`
+        +`opacity:${isEnabled?1:0.28};`
+        +`cursor:${isEnabled?'pointer':'not-allowed'};`;
+      const iw=document.createElement('div');
+      iw.style.cssText='display:flex;align-items:center;justify-content:center;width:100%;';
+      /* ウィザード用は大サイズアイコン (mrIconRes / viewBox 56×32) を使用。
+         セル幅にフィットするよう SVG の width を調整 */
+      iw.innerHTML=mrIconRes(resId,c).replace('width="56" height="32"','width="100%" height="32" preserveAspectRatio="xMidYMid meet"');
+      const sub=document.createElement('div');
+      /* 縦横比サブテキストもアイコンに合わせて白系に */
+      sub.style.cssText=`font-size:7px;color:${isCursor?'#c0d0e0':'#7a8898'};font-family:var(--font-mono);white-space:nowrap;`;
+      sub.textContent=r?r.sub.split('  ')[1]:'';
+      cell.appendChild(iw); cell.appendChild(sub);
+      cell.addEventListener('click',()=>{
+        /* 無効セルはカーソル移動のみ許可 (確定はしない) */
+        MRW.gridRow=ri; MRW.gridCol=ci;
+        if (isEnabled) {
+          MRW.resIdx=MR_RES.indexOf(r);
+          MRW.fpsIdx=0; MRW.compIdx=0;
+        }
+        mrRenderAll();
+      });
+      rowEl.appendChild(cell);
+    });
+    inner.appendChild(rowEl);
+  });
+  container.appendChild(inner);
+}
+
+/* ── fpsグリッド（最大2行×6列） ── */
+function mrRenderFpsGrid(container) {
+  const inner=document.createElement('div');
+  inner.style.cssText='padding:6px 8px 6px 0;display:flex;flex-direction:column;gap:5px;overflow:hidden;justify-content:flex-start;flex:1;';
+  const allFps=mrFpsAll();
+  const COLS=6;
+  const rows=[];
+  for(let i=0;i<allFps.length;i+=COLS) rows.push(allFps.slice(i,i+COLS));
+
+  rows.forEach((rowFps)=>{
+    const rowEl=document.createElement('div');
+    rowEl.style.cssText=MR_ROW_STYLE;
+    rowFps.forEach(f=>{
+      const fi=allFps.indexOf(f);
+      const isSel=MRW.fpsIdx===fi;
+      const c=isSel?'#f0a090':'#3a5060';
+      const btn=document.createElement('div');
+      btn.style.cssText=MR_CELL_BASE
+        +`padding:4px 2px;`
+        +`border:${isSel?'2px solid #e05040':'1px solid #1a2a38'};`
+        +`background:${isSel?'#0e1e2e':'transparent'};`;
+      const iw=document.createElement('div');
+      iw.style.cssText='display:flex;align-items:center;justify-content:center;width:100%;';
+      /* ウィザード用は大サイズアイコン (mrIconFps / viewBox 56×22) を使用。
+         セル幅にフィットするよう SVG の width を調整 */
+      iw.innerHTML=mrIconFps(f,c).replace('width="56" height="22"','width="100%" height="22" preserveAspectRatio="xMidYMid meet"');
+      btn.appendChild(iw);
+      btn.addEventListener('click',()=>{ MRW.fpsIdx=fi; mrRenderAll(); });
+      rowEl.appendChild(btn);
+    });
+    for(let k=rowFps.length;k<COLS;k++){
+      rowEl.appendChild(document.createElement('div'));
+    }
+    inner.appendChild(rowEl);
+  });
+  container.appendChild(inner);
+}
+
+/* ── 圧縮方式グリッド（最大2行×6列、アイコン+ラベル） ── */
+function mrRenderCompList(container) {
+  const inner=document.createElement('div');
+  inner.style.cssText='padding:6px 8px 6px 0;display:flex;flex-direction:column;gap:5px;overflow:hidden;justify-content:flex-start;flex:1;';
+  const comps=mrComps();
+  const COLS=6;
+  const rows=[];
+  for(let i=0;i<comps.length;i+=COLS) rows.push(comps.slice(i,i+COLS));
+
+  rows.forEach((rowComps,ri)=>{
+    const rowEl=document.createElement('div');
+    rowEl.style.cssText=MR_ROW_STYLE;
+    rowComps.forEach((comp,ci)=>{
+      const gi=ri*COLS+ci;
+      const isSel=MRW.compIdx===gi;
+      const isEnabled=isCompEnabled(comp, mrRes().id);
+      const c=isSel?'#f0a090':'#fff';
+      const cell=document.createElement('div');
+      cell.style.cssText=MR_CELL_BASE
+        +`gap:3px;padding:4px 2px;`
+        +`border:${isSel?'2px solid #e05040':'1px solid #1a2a38'};`
+        +`background:${isSel?'#0e1e2e':'transparent'};`
+        +`opacity:${isEnabled?1:0.28};`
+        +`cursor:${isEnabled?'pointer':'not-allowed'};`;
+      const iw=document.createElement('div');
+      iw.style.cssText='display:flex;align-items:center;justify-content:center;width:100%;';
+      /* ウィザード用は大サイズアイコン (mrIconComp / viewBox 56×22) を使用 */
+      iw.innerHTML=mrIconComp(comp.iconId,c).replace('width="56" height="22"','width="100%" height="22" preserveAspectRatio="xMidYMid meet"');
+      cell.appendChild(iw);
+      cell.addEventListener('click',()=>{
+        /* 無効セルはカーソル移動のみ (確定はしない) */
+        if (isEnabled) MRW.compIdx=gi;
+        mrRenderAll();
+      });
+      rowEl.appendChild(cell);
+    });
+    for(let k=rowComps.length;k<COLS;k++){
+      rowEl.appendChild(document.createElement('div'));
+    }
+    inner.appendChild(rowEl);
+  });
+  container.appendChild(inner);
+}
+
+/* ── キー操作 ── */
+function mrNavUp() {
+  if(MRW.tab===0){
+    MRW.gridRow=Math.max(0,MRW.gridRow-1); mrApplyGridRes();
+  } else if(MRW.tab===1){
+    const a=mrFpsAll(); MRW.fpsIdx=(MRW.fpsIdx-1+a.length)%a.length;
+  } else {
+    const l=mrComps().length; MRW.compIdx=(MRW.compIdx-1+l)%l;
+  }
+  mrRenderAll();
+}
+function mrNavDown() {
+  if(MRW.tab===0){
+    MRW.gridRow=Math.min(MR_RES_GRID.length-1,MRW.gridRow+1); mrApplyGridRes();
+  } else if(MRW.tab===1){
+    const a=mrFpsAll(); MRW.fpsIdx=(MRW.fpsIdx+1)%a.length;
+  } else {
+    const l=mrComps().length; MRW.compIdx=(MRW.compIdx+1)%l;
+  }
+  mrRenderAll();
+}
+function mrNavLeft() {
+  if(MRW.tab===0){
+    if(MRW.gridCol>0){ MRW.gridCol--; mrApplyGridRes(); mrRenderAll(); }
+    else { MRW.tab=(MRW.tab-1+3)%3; MRW.gridRow=0; MRW.gridCol=0; mrRenderAll(); }
+  } else { MRW.tab=(MRW.tab-1+3)%3; MRW.gridRow=0; MRW.gridCol=0; mrRenderAll(); }
+}
+function mrNavRight() {
+  if(MRW.tab===0){
+    const cols=MR_RES_GRID[MRW.gridRow]?.length||1;
+    if(MRW.gridCol<cols-1){ MRW.gridCol++; mrApplyGridRes(); mrRenderAll(); }
+    else { MRW.tab=(MRW.tab+1)%3; MRW.gridRow=0; MRW.gridCol=0; mrRenderAll(); }
+  } else { MRW.tab=(MRW.tab+1)%3; MRW.gridRow=0; MRW.gridCol=0; mrRenderAll(); }
+}
+function mrApplyGridRes() {
+  const resId=MR_RES_GRID[MRW.gridRow]?.[MRW.gridCol]; if(!resId) return;
+  /* 無効セルではカーソル位置だけ更新し、解像度の確定はしない */
+  if (!isResEnabled(resId)) return;
+  const idx=MR_RES.findIndex(r=>r.id===resId);
+  if(idx>=0){ MRW.resIdx=idx; MRW.fpsIdx=0; MRW.compIdx=0; }
+}
+function mrEnter() { mrConfirm(); }
+function mrBack()  { closeDialog(); }
+
+function mrConfirm() {
+  /* Enter/SET 押下時の拒否判定:
+       タブ0 (解像度): カーソル位置のセルが無効なら拒否
+       タブ2 (圧縮方式): カーソル位置の comp が無効なら拒否
+       (タブ1 fps は排他制御の対象外なので常に許可) */
+  if (MRW.tab === 0) {
+    const resId = MR_RES_GRID[MRW.gridRow]?.[MRW.gridCol];
+    if (resId && !isResEnabled(resId)) {
+      addLog('warn','✗ DENY','選択不可 (メイン記録形式と非互換)');
+      return;
+    }
+  } else if (MRW.tab === 2) {
+    const comp = mrComps()[MRW.compIdx];
+    if (comp && !isCompEnabled(comp, mrRes().id)) {
+      addLog('warn','✗ DENY','選択不可 (メイン記録形式と非互換)');
+      return;
+    }
+  }
+  const r=mrRes(), fps=mrCurrentFps(), comp=mrCurrentComp();
+  const srcItem=currentItem();
+  const resLabel=lang==='ja'?r.ja:r.en;
+  const compLabel=comp?mrCompLabel(comp):'—';
+  const summary=`${resLabel}  ${fps}fps  ${compLabel}`;
+  if(srcItem){
+    srcItem.value=summary;
+    srcItem.mrData={ resId:r.id, fps, compIconId:comp?comp.iconId:'std_intra' };
+  }
+  addLog('set','✓ REC',summary);
+  addLog('set','  Mbps',comp?comp.mbps:'—');
+  closeDialog(); render();
+}
+
+
+
+  /* ① タイトル行 */
+
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  SECTION 7: WIZARD — TIMELAPSE                                ║
+   ║  タイムラプス動画設定ウィザード (TLW / tlXxx)                               ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+/* ── タイムラプス動画ウィザード / EOS R5 Mark II: Time-lapse movie / 設定項目: / 1. Time-lapse        : Disable / Enable / 2. Interval          : 00:00:02 〜 99:59:59 / 3. No. of shots      : 0002 〜 3600 / 4. Movie rec. size   : 解像度+fps+圧縮（タイムラプス専用） / 5. Main rec. format  : XF-HEVC S / XF-AVC S 422 / XF-AVC S 420 / 6. Auto exposure     : Fixed 1st frame / Each frame / 7. Screen auto off   : Disable / Enable / 8. Beep per shot     : 0 〜 5 ── */
+const TLW = {
+  enabled:    true,           /* Time-lapse ON/OFF */
+  intH: 0, intM: 0, intS: 2, /* Interval 00:00:02 */
+  shots:      300,            /* No. of shots */
+  recSizeIdx: 0,              /* Movie rec. size インデックス */
+  formatIdx:  0,              /* Main rec. format インデックス */
+  aeIdx:      0,              /* Auto exposure */
+  screenOff:  false,          /* Screen auto off */
+  beep:       1,              /* Beep per shot 0〜5 */
+  /* 編集フォーカス: メインリストの行インデックス */
+  rowIdx: 0,
+  /* サブ編集モード: null | 'interval' | 'shots' | 'recsize' | 'select' */
+  editMode: null,
+  editSelectIdx: 0,
+  /* interval 編集中のフィールド（0=H, 1=M, 2=S） */
+  intField: 0,
+  /* shots 編集中の桁フィールド（0=千, 1=百, 2=十, 3=一） */
+  shotsField: 0,
+};
+
+/* タイムラプス専用 Movie rec. size 選択肢 */
+const TL_RECSIZES = [
+  { resId:'8ku', fps:'29.97', compIconId:'std_intra', ja:'8K-U  29.97fps  標準イントラ',     en:'8K-U  29.97fps  Std Intra'   },
+  { resId:'8ku', fps:'29.97', compIconId:'lt_intra',  ja:'8K-U  29.97fps  軽量イントラ',     en:'8K-U  29.97fps  Light Intra' },
+  { resId:'4ku', fps:'29.97', compIconId:'hi_intra',  ja:'4K-U  29.97fps  高画質イントラ',   en:'4K-U  29.97fps  High Intra'  },
+  { resId:'4ku', fps:'29.97', compIconId:'std_intra', ja:'4K-U  29.97fps  標準イントラ',     en:'4K-U  29.97fps  Std Intra'   },
+  { resId:'4ku', fps:'29.97', compIconId:'lt_intra',  ja:'4K-U  29.97fps  軽量イントラ',     en:'4K-U  29.97fps  Light Intra' },
+  { resId:'fhd', fps:'29.97', compIconId:'std_intra', ja:'Full HD  29.97fps  標準イントラ',  en:'Full HD  29.97fps  Std Intra'},
+];
+function tlRecSizeLabel(idx, l){ const r=TL_RECSIZES[idx]; if(!r) return ''; return l==='en'?r.en:r.ja; }
+
+const TL_FORMATS = {
+  ja:['XF-HEVC S YCC422 10bit','XF-AVC S YCC422 10bit','XF-AVC S YCC420 8bit'],
+  en:['XF-HEVC S YCC422 10bit','XF-AVC S YCC422 10bit','XF-AVC S YCC420 8bit'],
+};
+const TL_AE = {
+  ja:['1枚目の露出で固定','各コマで自動調整'],
+  en:['Fixed 1st frame','Each frame'],
+};
+
+/* ── 計算ヘルパー ── */
+function tlIntervalSec() { return TLW.intH*3600 + TLW.intM*60 + TLW.intS; }
+function tlRequiredSec() { return tlIntervalSec() * TLW.shots; }
+function tlPlaybackSec() { return TLW.shots / 29.97; } /* NTSC 29.97fps固定 */
+function tlFmtTime(sec) {
+  const d=Math.floor(sec/86400), h=Math.floor((sec%86400)/3600);
+  const m=Math.floor((sec%3600)/60), s=Math.floor(sec%60);
+  if(d>=2) return `${d} days`;
+  if(d===1) return `${h+24}h ${String(m).padStart(2,'0')}m`;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function tlFmtPlayback(sec) {
+  const m=Math.floor(sec/60), s=Math.floor(sec%60);
+  return `${String(m).padStart(2,'0')}'${String(s).padStart(2,'0')}"`;
+}
+
+/* ── メイン行定義 ── */
+function tlRows() {
+  const l = lang;
+  const intStr = `${String(TLW.intH).padStart(2,'0')}:${String(TLW.intM).padStart(2,'0')}:${String(TLW.intS).padStart(2,'0')}`;
+  const enabled = TLW.enabled;
+  return [
+    { key:'enabled',  ja:'タイムラプス撮影',  en:'Time-lapse',
+      val: TLW.enabled ? (l==='ja'?'する':'Enable') : (l==='ja'?'しない':'Disable'), edit:'select' },
+    { key:'interval', ja:'撮影間隔',           en:'Interval',
+      val: intStr, edit: enabled?'interval':null, dim:!enabled },
+    { key:'shots',    ja:'撮影枚数',           en:'No. of shots',
+      val: String(TLW.shots).padStart(4,'0'), edit: enabled?'shots':null, dim:!enabled },
+    { key:'recsize',  ja:'動画記録サイズ',     en:'Movie rec. size',
+      val: tlRecSizeLabel(TLW.recSizeIdx,l), mrData: TL_RECSIZES[TLW.recSizeIdx], edit: enabled?'recsize':null, dim:!enabled },
+    { key:'format',   ja:'メイン記録形式',     en:'Main rec. format',
+      val: (TL_FORMATS[l]||TL_FORMATS.ja)[TLW.formatIdx], edit: enabled?'select':null, dim:!enabled },
+    { key:'ae',       ja:'自動露出',           en:'Auto exposure',
+      val: (TL_AE[l]||TL_AE.ja)[TLW.aeIdx], edit: enabled?'select':null, dim:!enabled },
+    { key:'screenoff',ja:'モニター自動消灯',   en:'Screen auto off',
+      val: TLW.screenOff?(l==='ja'?'する':'Enable'):(l==='ja'?'しない':'Disable'), edit: enabled?'select':null, dim:!enabled },
+    { key:'beep',     ja:'撮影時の電子音',     en:'Beep per shot',
+      val: String(TLW.beep), edit: enabled?'beep':null, dim:!enabled },
+  ];
+}
+
+/* ── ウィザードを開く ── */
+function showTimelapsWizard() {
+  removeDialog();
+  /* メニュー側 srcItem.value から TLW.enabled を復元（する/しない の同期） */
+  const src=currentItem();
+  if(src && typeof src.value==='string'){
+    const ja = src.value.split('/')[0];
+    if(ja==='する')      TLW.enabled = true;
+    else if(ja==='しない') TLW.enabled = false;
+  }
+  const ov = document.createElement('div');
+  ov.id='tlWiz';
+  ov.style.cssText='position:absolute;inset:0;background:#040810;z-index:200;display:flex;flex-direction:column;overflow:hidden;';
+  ov.innerHTML=`
+    <div style="flex-shrink:0;background:#030608;border-bottom:1px solid #0a1520;display:flex;align-items:center;justify-content:space-between;padding:4px 9px;">
+      <span id="tlTitle" style="font-size:12px;font-weight:bold;color:#fff;letter-spacing:.06em;font-family:var(--font-mono);border-bottom:2px solid var(--tc,#d07020);padding-bottom:2px;">タイムラプス動画</span>
+      <span style="font-size:9px;color:#888;font-family:var(--font-mono)" id="tlSummary"></span>
+    </div>
+    <div id="tlMainArea" style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0;"></div>
+    <div style="flex-shrink:0;background:#030608;border-top:1px solid #0a1520;display:flex;align-items:center;justify-content:space-between;padding:3px 9px;">
+      <span id="tlHint" style="font-size:11px;color:#888;font-family:var(--font-mono)">↑↓:選択  SET:編集  MENU:閉じる</span>
+      <span id="tlCalc" style="font-size:11px;color:#fff;font-family:var(--font-mono)"></span>
+    </div>`;
+  $('lcd').appendChild(ov);
+  tlRender();
+}
+
+/* ── メインリストを描画 ── */
+function tlRender() {
+  const area = document.getElementById('tlMainArea'); if(!area) return;
+  area.innerHTML='';
+
+  /* 撮影所要時間・再生時間の計算 */
+  const reqSec = tlRequiredSec(), pbSec = tlPlaybackSec();
+  const calcEl = document.getElementById('tlCalc');
+  if(calcEl && TLW.enabled) {
+    calcEl.textContent = `⏱ ${tlFmtTime(reqSec)}  ▶ ${tlFmtPlayback(pbSec)}`;
+    calcEl.style.color = (pbSec < 1) ? '#c05030' : '#fff';
+  } else if(calcEl) { calcEl.textContent=''; }
+
+  const titleEl = document.getElementById('tlTitle');
+  if(titleEl) {
+    if(TLW.editMode) {
+      /* 編集中はカーソル行のラベルをタイトルに表示（階層を明示） */
+      const r = tlRows()[TLW.rowIdx];
+      titleEl.textContent = r ? (lang==='ja'?r.ja:r.en) : (lang==='ja'?'タイムラプス動画':'Time-lapse movie');
+    } else {
+      titleEl.textContent = lang==='ja'?'タイムラプス動画':'Time-lapse movie';
+    }
+  }
+
+  /* サブ編集モードが開いていれば専用UI */
+  const mode = TLW.editMode;
+  if(mode==='interval') { tlRenderIntervalEdit(area); return; }
+  if(mode==='shots')    { tlRenderShotsEdit(area); return; }
+  if(mode==='recsize')  { tlRenderRecsizeEdit(area); return; }
+  if(mode==='select')   { tlRenderSelectEdit(area); return; }
+  if(mode==='beep')     { tlRenderBeepEdit(area); return; }
+
+  /* メインリスト */
+  const rows = tlRows();
+  const ROW_H=32, areaH=346-28-26;
+  const maxV=Math.floor(areaH/ROW_H);
+  const ri=TLW.rowIdx;
+  const start=Math.max(0,Math.min(ri-Math.floor(maxV/2),rows.length-maxV));
+  rows.slice(start,start+maxV).forEach((row,si)=>{
+    const realIdx=start+si, sel=realIdx===TLW.rowIdx;
+    const dim=row.dim;
+    const el=document.createElement('div');
+    el.style.cssText=`display:flex;align-items:center;height:${ROW_H}px;padding:0 9px;
+      border-top:1px solid ${sel?'var(--tc,#d07020)':'transparent'};
+      border-bottom:1px solid ${sel?'var(--tc,#d07020)':'transparent'};
+      border-left:10px solid ${sel?'var(--tc,#d07020)':'transparent'};
+      border-right:10px solid ${sel?'var(--tc,#d07020)':'transparent'};
+      background:${sel?'rgba(255,255,255,.06)':'transparent'};
+      cursor:${dim?'default':'pointer'};flex-shrink:0;box-sizing:border-box;`;
+    /* ラベル span */
+    const labelHtml = `<span style="flex:0 0 50%;font-size:13px;font-family:var(--font-mono);color:${dim?'#444':'#fff'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">`+
+      esc(lang==='ja'?row.ja:row.en)+
+      `</span>`;
+    if(row.key==='recsize' && row.mrData){
+      /* recsize 行は値部分をアイコン3連で表示（メイン側 m1_1 と同じ構造） */
+      const iconColor=dim?'#555':'#fff';
+      el.innerHTML = labelHtml;
+      const valWrap=document.createElement('div');
+      valWrap.style.cssText='flex:0 0 50%;display:flex;align-items:center;gap:6px;overflow:hidden;';
+      const r=document.createElement('div'); r.innerHTML=mrIconResSmall(row.mrData.resId, iconColor); valWrap.appendChild(r);
+      const f=document.createElement('div'); f.innerHTML=mrIconFpsSmall(row.mrData.fps, iconColor); valWrap.appendChild(f);
+      const c=document.createElement('div'); c.innerHTML=mrIconCompSmall(row.mrData.compIconId, iconColor); valWrap.appendChild(c);
+      el.appendChild(valWrap);
+    } else {
+      el.innerHTML = labelHtml +
+        `<span style="flex:0 0 50%;font-size:13px;font-family:var(--font-mono);color:${dim?'#333':sel?'var(--tc,#d07020)':'#fff'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;">`+
+          esc(row.val)+
+        `</span>`;
+    }
+    if(!dim){
+      el.addEventListener('click',()=>{ TLW.rowIdx=realIdx; tlRender(); });
+      el.addEventListener('dblclick',()=>{ TLW.rowIdx=realIdx; tlStartEdit(); });
+    }
+    area.appendChild(el);
+  });
+
+  /* ヒント更新 */
+  const hintEl=document.getElementById('tlHint');
+  if(hintEl) hintEl.textContent = lang==='ja'
+    ?'↑↓:選択  SET:編集  MENU:閉じる'
+    :'↑↓:Select  SET:Edit  MENU:Close';
+
+  /* サマリー */
+  const sumEl=document.getElementById('tlSummary');
+  if(sumEl) sumEl.textContent = TLW.enabled
+    ? `${String(TLW.shots).padStart(4,'0')} shots`
+    : (lang==='ja'?'無効':'Disabled');
+}
+
+/* ── Interval 編集UI ── */
+function tlRenderIntervalEdit(area) {
+  const H=String(TLW.intH).padStart(2,'0');
+  const M=String(TLW.intM).padStart(2,'0');
+  const S=String(TLW.intS).padStart(2,'0');
+  const parts=[H,M,S];
+  const labels=lang==='ja'?['時','分','秒']:['h','m','s'];
+
+  const wrap=document.createElement('div');
+  wrap.style.cssText='flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:10px;';
+
+  /* 時:分:秒 セグメント表示 */
+  const seg=document.createElement('div');
+  seg.style.cssText='display:flex;align-items:center;gap:4px;';
+  parts.forEach((p,i)=>{
+    const sel=i===TLW.intField;
+    const box=document.createElement('div');
+    box.style.cssText=`display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;`;
+    box.innerHTML=
+      `<div style="font-size:20px;font-family:var(--font-mono);font-weight:bold;`+
+      `color:${sel?'var(--tc,#d07020)':'#fff'};`+
+      `border-bottom:2px solid ${sel?'var(--tc,#d07020)':'transparent'};`+
+      `padding:2px 8px;min-width:44px;text-align:center;">${esc(p)}</div>`+
+      `<div style="font-size:9px;color:#888;font-family:var(--font-mono);">${labels[i]}</div>`;
+    box.addEventListener('click',()=>{ TLW.intField=i; tlRender(); });
+    seg.appendChild(box);
+    if(i<2){ const colon=document.createElement('div'); colon.style.cssText='font-size:20px;color:#fff;font-family:var(--font-mono);padding-bottom:14px;'; colon.textContent=':'; seg.appendChild(colon); }
+  });
+  wrap.appendChild(seg);
+
+  /* 所要時間プレビュー */
+  const prev=document.createElement('div');
+  prev.style.cssText='font-size:9px;color:#888;font-family:var(--font-mono);';
+  prev.textContent=`⏱ ${tlFmtTime(tlRequiredSec())}  ▶ ${tlFmtPlayback(tlPlaybackSec())}`;
+  wrap.appendChild(prev);
+
+  /* ガイド */
+  const guide=document.createElement('div');
+  guide.style.cssText='font-size:9px;color:#666;font-family:var(--font-mono);';
+  guide.textContent=lang==='ja'?'↑↓:値変更  ←→:フィールド移動  SET:確定  MENU:戻る':'↑↓:Change  ←→:Field  SET:OK  MENU:Back';
+  wrap.appendChild(guide);
+
+  area.appendChild(wrap);
+
+  const hintEl=document.getElementById('tlHint');
+  if(hintEl) hintEl.textContent='';
+}
+
+/* ── No. of shots 編集UI ── */
+function tlRenderShotsEdit(area) {
+  const digits=[
+    Math.floor(TLW.shots/1000)%10,
+    Math.floor(TLW.shots/100)%10,
+    Math.floor(TLW.shots/10)%10,
+    TLW.shots%10,
+  ];
+  const wrap=document.createElement('div');
+  wrap.style.cssText='flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:10px;';
+
+  const seg=document.createElement('div');
+  seg.style.cssText='display:flex;align-items:center;gap:3px;';
+  digits.forEach((d,i)=>{
+    const sel=i===TLW.shotsField;
+    const box=document.createElement('div');
+    box.style.cssText=`font-size:24px;font-family:var(--font-mono);font-weight:bold;`+
+      `color:${sel?'var(--tc,#d07020)':'#fff'};`+
+      `border-bottom:2px solid ${sel?'var(--tc,#d07020)':'transparent'};`+
+      `padding:2px 6px;min-width:32px;text-align:center;cursor:pointer;`;
+    box.textContent=d;
+    box.addEventListener('click',()=>{ TLW.shotsField=i; tlRender(); });
+    seg.appendChild(box);
+  });
+  wrap.appendChild(seg);
+
+  /* 再生時間プレビュー */
+  const pbSec=tlPlaybackSec();
+  const prev=document.createElement('div');
+  prev.style.cssText=`font-size:9px;font-family:var(--font-mono);color:${pbSec<1?'#c05030':'#888'};`;
+  prev.textContent=`▶ ${tlFmtPlayback(pbSec)}  ⏱ ${tlFmtTime(tlRequiredSec())}`;
+  wrap.appendChild(prev);
+
+  const guide=document.createElement('div');
+  guide.style.cssText='font-size:9px;color:#666;font-family:var(--font-mono);';
+  guide.textContent=lang==='ja'?'↑↓:値変更  ←→:桁移動  SET:確定  MENU:戻る':'↑↓:Change  ←→:Digit  SET:OK  MENU:Back';
+  wrap.appendChild(guide);
+
+  area.appendChild(wrap);
+
+  const hintEl=document.getElementById('tlHint');
+  if(hintEl) hintEl.textContent='';
+}
+
+/* ── Movie rec. size 編集UI ── */
+function tlRenderRecsizeEdit(area) {
+  const wrap=document.createElement('div');
+  wrap.style.cssText='flex:1;display:flex;flex-direction:column;';
+
+  TL_RECSIZES.forEach((rec,i)=>{
+    const sel=i===TLW.editSelectIdx;
+    const el=document.createElement('div');
+    el.style.cssText=`display:flex;align-items:center;justify-content:flex-start;gap:10px;padding:4px 8px;cursor:pointer;`+
+      `border-top:1px solid ${sel?'var(--tc,#d07020)':'transparent'};`+
+      `border-bottom:1px solid ${sel?'var(--tc,#d07020)':'#0a1520'};`+
+      `border-left:10px solid ${sel?'var(--tc,#d07020)':'transparent'};`+
+      `border-right:10px solid ${sel?'var(--tc,#d07020)':'transparent'};`+
+      `background:${sel?'rgba(255,255,255,.06)':'transparent'};flex-shrink:0;box-sizing:border-box;`;
+    const r=document.createElement('div'); r.style.cssText='width:48px;flex-shrink:0;'; r.innerHTML=mrIconResSmall(rec.resId, '#fff');  el.appendChild(r);
+    const f=document.createElement('div'); f.style.cssText='width:48px;flex-shrink:0;'; f.innerHTML=mrIconFpsSmall(rec.fps, '#fff');    el.appendChild(f);
+    const c=document.createElement('div'); c.style.cssText='width:64px;flex-shrink:0;'; c.innerHTML=mrIconCompSmall(rec.compIconId, '#fff'); el.appendChild(c);
+    el.addEventListener('click',()=>{ TLW.editSelectIdx=i; tlRender(); });
+    el.addEventListener('dblclick',()=>{ TLW.editSelectIdx=i; tlConfirmSelect(); });
+    wrap.appendChild(el);
+  });
+
+  /* ガイド */
+  const guide=document.createElement('div');
+  guide.style.cssText='font-size:9px;color:#666;font-family:var(--font-mono);padding:3px 8px;border-top:1px solid #0a1520;margin-top:auto;flex-shrink:0;';
+  guide.textContent=lang==='ja'?'↑↓:選択  SET:確定  MENU:戻る':'↑↓:Select  SET:OK  MENU:Back';
+  wrap.appendChild(guide);
+  area.appendChild(wrap);
+
+  const hintEl=document.getElementById('tlHint');
+  if(hintEl) hintEl.textContent='';
+}
+
+/* ── select系（Format / AE / Screen off）編集UI ── */
+function tlRenderSelectEdit(area) {
+  const row = tlRows()[TLW.rowIdx];
+  let opts;
+  if(row.key==='format')    opts=TL_FORMATS[lang]||TL_FORMATS.ja;
+  else if(row.key==='ae')   opts=TL_AE[lang]||TL_AE.ja;
+  else if(row.key==='screenoff') opts=lang==='ja'?['しない','する']:['Disable','Enable'];
+  else if(row.key==='enabled')   opts=lang==='ja'?['しない','する']:['Disable','Enable'];
+  else opts=['?'];
+
+  const wrap=document.createElement('div');
+  wrap.style.cssText='flex:1;display:flex;flex-direction:column;justify-content:center;';
+
+  opts.forEach((label,i)=>{
+    const sel=i===TLW.editSelectIdx;
+    const el=document.createElement('div');
+    el.style.cssText=`display:flex;align-items:center;gap:6px;padding:5px 8px;cursor:pointer;`+
+      `border-top:1px solid ${sel?'var(--tc,#d07020)':'transparent'};`+
+      `border-bottom:1px solid ${sel?'var(--tc,#d07020)':'#0a1520'};`+
+      `border-left:10px solid ${sel?'var(--tc,#d07020)':'transparent'};`+
+      `border-right:10px solid ${sel?'var(--tc,#d07020)':'transparent'};`+
+      `background:${sel?'rgba(255,255,255,.06)':'transparent'};flex-shrink:0;box-sizing:border-box;`;
+    el.innerHTML=
+      `<span style="font-size:9px;color:${sel?'var(--tc,#d07020)':'#888'};font-family:var(--font-mono);">${sel?'●':'○'}</span>`+
+      `<span style="font-size:13px;color:#fff;font-family:var(--font-mono);">${esc(label)}</span>`;
+    el.addEventListener('click',()=>{ TLW.editSelectIdx=i; tlRender(); });
+    el.addEventListener('dblclick',()=>{ TLW.editSelectIdx=i; tlConfirmSelect(); });
+    wrap.appendChild(el);
+  });
+
+  const guide=document.createElement('div');
+  guide.style.cssText='font-size:9px;color:#666;font-family:var(--font-mono);padding:3px 8px;flex-shrink:0;';
+  guide.textContent=lang==='ja'?'↑↓:選択  SET:確定  MENU:戻る':'↑↓:Select  SET:OK  MENU:Back';
+  wrap.appendChild(guide);
+  area.appendChild(wrap);
+
+  const hintEl=document.getElementById('tlHint');
+  if(hintEl) hintEl.textContent='';
+}
+
+/* ── Beep 編集UI ── */
+function tlRenderBeepEdit(area) {
+  const wrap=document.createElement('div');
+  wrap.style.cssText='flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px;';
+
+  const val=document.createElement('div');
+  val.style.cssText='font-size:40px;font-family:var(--font-mono);font-weight:bold;color:var(--tc,#d07020);';
+  val.textContent=String(TLW.beep);
+  wrap.appendChild(val);
+
+  const sub=document.createElement('div');
+  sub.style.cssText='font-size:9px;color:#888;font-family:var(--font-mono);';
+  sub.textContent=lang==='ja'?'0 = ビープなし':'0 = No beep';
+  wrap.appendChild(sub);
+
+  const guide=document.createElement('div');
+  guide.style.cssText='font-size:9px;color:#666;font-family:var(--font-mono);';
+  guide.textContent=lang==='ja'?'↑:+1  ↓:−1  SET:確定  MENU:戻る':'↑:+1  ↓:−1  SET:OK  MENU:Back';
+  wrap.appendChild(guide);
+
+  area.appendChild(wrap);
+  const hintEl=document.getElementById('tlHint');
+  if(hintEl) hintEl.textContent='';
+}
+
+/* ── 編集開始 ── */
+function tlStartEdit() {
+  const row=tlRows()[TLW.rowIdx];
+  if(!row||!row.edit) return;
+  TLW.editMode=row.edit;
+  TLW.intField=0;
+  TLW.shotsField=0;
+  /* selectの初期位置 */
+  if(row.edit==='select'||row.edit==='recsize') {
+    if(row.key==='enabled')    TLW.editSelectIdx=TLW.enabled?1:0;
+    else if(row.key==='format')    TLW.editSelectIdx=TLW.formatIdx;
+    else if(row.key==='ae')        TLW.editSelectIdx=TLW.aeIdx;
+    else if(row.key==='screenoff') TLW.editSelectIdx=TLW.screenOff?1:0;
+    else if(row.key==='recsize')   TLW.editSelectIdx=TLW.recSizeIdx;
+  }
+  tlRender();
+}
+
+/* ── SELECT系確定 ── */
+function tlConfirmSelect() {
+  const row=tlRows()[TLW.rowIdx];
+  const i=TLW.editSelectIdx;
+  if(row.key==='enabled')    { TLW.enabled=i===1; addLog('set','⏱ TL',TLW.enabled?'Enable':'Disable'); }
+  else if(row.key==='format')    { TLW.formatIdx=i; addLog('set','⏱ TL FORMAT',(TL_FORMATS.ja)[i]); }
+  else if(row.key==='ae')        { TLW.aeIdx=i;    addLog('set','⏱ TL AE',(TL_AE.ja)[i]); }
+  else if(row.key==='screenoff') { TLW.screenOff=i===1; addLog('set','⏱ TL SCREEN',TLW.screenOff?'Enable':'Disable'); }
+  else if(row.key==='recsize')   { TLW.recSizeIdx=i; addLog('set','⏱ TL SIZE',tlRecSizeLabel(i,'ja')); }
+  TLW.editMode=null;
+  /* srcItem（タイムラプス）の value を更新 */
+  tlWriteBack();
+  tlRender();
+}
+
+/* ── ナビゲーション（メインリスト） ── */
+function tlNavUp() {
+  const mode=TLW.editMode;
+  if(!mode){
+    const rows=tlRows(); TLW.rowIdx=(TLW.rowIdx-1+rows.length)%rows.length; tlRender(); return;
+  }
+  if(mode==='interval'){
+    const max=[99,59,59][TLW.intField];
+    if(TLW.intField===0) TLW.intH=Math.min(99,TLW.intH+1);
+    else if(TLW.intField===1) TLW.intM=(TLW.intM+1)%60;
+    else TLW.intS=TLW.intS<2&&TLW.intH===0&&TLW.intM===0?2:(TLW.intS+1)%60;
+    tlRender(); return;
+  }
+  if(mode==='shots'){
+    const mul=[1000,100,10,1][TLW.shotsField];
+    TLW.shots=Math.min(3600,Math.max(2,TLW.shots+mul)); tlRender(); return;
+  }
+  if(mode==='select'||mode==='recsize'){
+    const row=tlRows()[TLW.rowIdx];
+    let len;
+    if(row.key==='format')    len=(TL_FORMATS.ja).length;
+    else if(row.key==='ae')   len=(TL_AE.ja).length;
+    else if(row.key==='recsize') len=TL_RECSIZES.length;
+    else len=2;
+    TLW.editSelectIdx=(TLW.editSelectIdx-1+len)%len; tlRender(); return;
+  }
+  if(mode==='beep'){ TLW.beep=Math.min(5,TLW.beep+1); tlRender(); return; }
+}
+function tlNavDown() {
+  const mode=TLW.editMode;
+  if(!mode){
+    const rows=tlRows(); TLW.rowIdx=(TLW.rowIdx+1)%rows.length; tlRender(); return;
+  }
+  if(mode==='interval'){
+    if(TLW.intField===0) TLW.intH=Math.max(0,TLW.intH-1);
+    else if(TLW.intField===1) TLW.intM=(TLW.intM-1+60)%60;
+    else { const s=TLW.intS-1; TLW.intS=(s<0)?59:Math.max(TLW.intH===0&&TLW.intM===0?2:0,s); }
+    tlRender(); return;
+  }
+  if(mode==='shots'){
+    const mul=[1000,100,10,1][TLW.shotsField];
+    TLW.shots=Math.min(3600,Math.max(2,TLW.shots-mul)); tlRender(); return;
+  }
+  if(mode==='select'||mode==='recsize'){
+    const row=tlRows()[TLW.rowIdx];
+    let len;
+    if(row.key==='format')    len=(TL_FORMATS.ja).length;
+    else if(row.key==='ae')   len=(TL_AE.ja).length;
+    else if(row.key==='recsize') len=TL_RECSIZES.length;
+    else len=2;
+    TLW.editSelectIdx=(TLW.editSelectIdx+1)%len; tlRender(); return;
+  }
+  if(mode==='beep'){ TLW.beep=Math.max(0,TLW.beep-1); tlRender(); return; }
+}
+function tlBack() {
+  if(TLW.editMode){ TLW.editMode=null; tlRender(); addLog('back','◀ TL','編集キャンセル'); }
+  else { closeDialog(); }
+}
+function tlEnter() {
+  if(!TLW.editMode){ tlStartEdit(); return; }
+  const mode=TLW.editMode;
+  if(mode==='interval'){
+    /* フィールドを右に進む。最後のフィールドで確定 */
+    if(TLW.intField<2){ TLW.intField++; tlRender(); }
+    else { addLog('set','⏱ TL INT',`${String(TLW.intH).padStart(2,'0')}:${String(TLW.intM).padStart(2,'0')}:${String(TLW.intS).padStart(2,'0')}`); TLW.editMode=null; tlWriteBack(); tlRender(); }
+    return;
+  }
+  if(mode==='shots'){
+    if(TLW.shotsField<3){ TLW.shotsField++; tlRender(); }
+    else { addLog('set','⏱ TL SHOTS',String(TLW.shots)); TLW.editMode=null; tlWriteBack(); tlRender(); }
+    return;
+  }
+  if(mode==='beep'){
+    addLog('set','⏱ TL BEEP',String(TLW.beep)); TLW.editMode=null; tlWriteBack(); tlRender(); return;
+  }
+  /* select / recsize */
+  tlConfirmSelect();
+}
+/* interval / shots でフィールド左移動 */
+function tlNavFieldLeft() {
+  if(TLW.editMode==='interval') { TLW.intField=Math.max(0,TLW.intField-1); tlRender(); }
+  else if(TLW.editMode==='shots') { TLW.shotsField=Math.max(0,TLW.shotsField-1); tlRender(); }
+}
+function tlNavFieldRight() {
+  if(TLW.editMode==='interval') { TLW.intField=Math.min(2,TLW.intField+1); tlRender(); }
+  else if(TLW.editMode==='shots') { TLW.shotsField=Math.min(3,TLW.shotsField+1); tlRender(); }
+}
+
+/* ── JSONデータへ書き戻す ── */
+function tlWriteBack() {
+  const srcItem=currentItem(); if(!srcItem) return;
+  /* メニュー行にはタイムラプス撮影の ON/OFF のみ反映（する/しない） */
+  srcItem.value = TLW.enabled ? 'する/Enable' : 'しない/Disable';
+  render();
+}
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  SECTION 8: UTILITIES                                         ║
+   ║  removeDialog / applyJson / loadSample / resetSim / log / bindKeys / esc║
+   ╚══════════════════════════════════════════════════════════════╝ */
+function removeDialog(){
+  const e=$('ov');    if(e) e.remove();
+  const m=$('mrWiz'); if(m) m.remove();
+  const t=$('tlWiz'); if(t) t.remove();
+}
+
+/* ── JSON エディター ── */
+function applyJson() {
+  const ed=$('ed'), em=$('errmsg');
+  try {
+    const p=JSON.parse(ed.value);
+    for(const m of['stills','movie']){
+      if(!p[m]?.tabs) throw new Error(`"${m}.tabs" が見つかりません`);
+      for(const t of p[m].tabs){
+        if(!t.id||!Array.isArray(t.pages)) throw new Error(`[${m}] タブ "${t.id||'?'}" に pages が必要です`);
+        for(const pg of t.pages)
+          if(!Array.isArray(pg.items)) throw new Error(`[${m}] "${t.id}" ページ ${pg.page} に items が必要です`);
+      }
+    }
+    DEF=p; ed.classList.remove('err'); em.classList.remove('show');
+    resetSim(); addLog('info','✓ LOAD',L('load_ok'));
+  } catch(e){ ed.classList.add('err'); em.textContent='⚠ '+e.message; em.classList.add('show'); }
+}
+
+function loadSample(){
+  DEF=JSON.parse(JSON.stringify(SAMPLE));
+  $('ed').value=JSON.stringify(SAMPLE,null,2);
+  $('errmsg').classList.remove('show'); $('ed').classList.remove('err');
+  resetSim();
+}
+
+function resetSim(){
+  tabIdx=0;pageIdx=0;rowIdx=0;inDialog=false;removeDialog();render();
+  addLog('info','RESET',L('reset_msg'));
+}
+
+/* ── ログ ── */
+function addLog(type,action,msg){
+  const p=$('logp'), ts=new Date().toTimeString().slice(0,8);
+  const el=document.createElement('div'); el.className=`le l-${type}`;
+  el.innerHTML=`<span class="lts">${ts}</span><span class="la">${esc(action)}</span><span class="lm">${esc(msg)}</span>`;
+  p.appendChild(el); p.scrollTop=p.scrollHeight;
+}
+function clearLog(){ $('logp').innerHTML=''; }
+
+/* ── キーバインド ── */
+function bindKeys(){
+  document.addEventListener('keydown',e=>{
+    if(['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
+    const map={
+      ArrowUp:navUp,ArrowDown:navDown,ArrowLeft:navLeft,ArrowRight:navRight,
+      Enter:execEnter,Escape:execBack,Backspace:execBack,
+      m:()=>switchMode(mode==='stills'?'movie':'stills'),
+      M:()=>switchMode(mode==='stills'?'movie':'stills'),
+      l:()=>setLang(lang==='ja'?'en':'ja'),
+      L:()=>setLang(lang==='ja'?'en':'ja'),
+    };
+    if(map[e.key]){e.preventDefault();map[e.key]();}
+  });
+}
+function bindButtons(){
+  document.querySelectorAll('.cb').forEach(btn=>{
+    const fn={up:navUp,down:navDown,left:navLeft,right:navRight,enter:execEnter,back:execBack}[btn.dataset.k];
+    if(!fn) return;
+    btn.addEventListener('click',()=>{fn();flashBtn(btn);});
+  });
+}
+function flashBtn(btn){ btn.classList.add('fl'); setTimeout(()=>btn.classList.remove('fl'),120); }
+
+/* ── スクリーンショット機能 (SVG foreignObject + Canvas → PNG) ──
+   外部ライブラリ不要。`#lcd` の現在の DOM を SVG に埋め込み、
+   ドキュメント全体の <style> も注入してスタイルを再現する。 */
+function takeScreenshot(){
+  try {
+    const lcd = document.getElementById('lcd');
+    if(!lcd) throw new Error('LCD not found');
+    const rect = lcd.getBoundingClientRect();
+    const W = Math.round(rect.width), H = Math.round(rect.height);
+
+    /* DOM をクローン（element 参照を切り離してシリアライズ可能に） */
+    const clone = lcd.cloneNode(true);
+    /* インラインで現在の transform/scroll に依存しない位置に固定 */
+    clone.style.margin = '0';
+    clone.style.transform = 'none';
+
+    /* ドキュメント内の <style> を結合（外部CSSは無いので <style> のみで十分） */
+    const styles = Array.from(document.querySelectorAll('style'))
+      .map(s => s.textContent).join('\n');
+
+    /* XHTML としてシリアライズ */
+    const xml = new XMLSerializer().serializeToString(clone);
+
+    /* SVG 構築。foreignObject 内に xhtml namespace を明示
+       外側の div で xmlns を宣言すれば子孫要素に継承される */
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`+
+        `<foreignObject width="100%" height="100%">`+
+          `<div xmlns="http://www.w3.org/1999/xhtml" style="width:${W}px;height:${H}px;">`+
+            `<style>${styles}</style>`+
+            xml+
+          `</div>`+
+        `</foreignObject>`+
+      `</svg>`;
+
+    /* Blob URL は Chrome で tainted canvas エラーになるため、
+       data URL（utf-8 % エンコード）を使用して同一オリジン扱いにする */
+    const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        /* デバイスピクセル比を考慮（高DPI対応） */
+        const dpr = window.devicePixelRatio || 1;
+        const canvas = document.createElement('canvas');
+        canvas.width  = W * dpr;
+        canvas.height = H * dpr;
+        const ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+        /* 黒背景（液晶画面の背景色） */
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, W, H);
+        ctx.drawImage(img, 0, 0, W, H);
+
+        /* PNG ダウンロード */
+        canvas.toBlob(b => {
+          const a = document.createElement('a');
+          const ts = new Date();
+          const pad = n => String(n).padStart(2,'0');
+          const fname = `dilc-menu-${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}-${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}.png`;
+          a.download = fname;
+          a.href = URL.createObjectURL(b);
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+          addLog('set','📸 SS', fname);
+        }, 'image/png');
+      } catch(err) {
+        addLog('back','📸 SS', L('screenshot_err')+': '+err.message);
+        console.error('Screenshot error:', err);
+      }
+    };
+    img.onerror = (e) => {
+      addLog('back','📸 SS', L('screenshot_err'));
+      console.error('Image load error:', e);
+    };
+    img.src = url;
+  } catch(err) {
+    addLog('back','📸 SS', L('screenshot_err')+': '+err.message);
+    console.error('Screenshot error:', err);
+  }
+}
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+init();
+</script>
+</body>
+</html>
