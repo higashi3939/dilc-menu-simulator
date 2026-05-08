@@ -1,9 +1,8 @@
 # DILC Menu Simulator
 
-デジタル一眼カメラ（DILC: Digital Interchangeable-Lens Camera）の液晶メニュー画面をブラウザ上でシミュレーションするツールです。  
-UIプロトタイピングや仕様検討に使用することを目的にしています。
+デジタル一眼カメラ（DILC: Digital Interchangeable-Lens Camera）の液晶メニュー画面をブラウザ上でシミュレーションするツールです。
 
-本ツールはジョークソフトです。
+本ツールおよびプログラムは無保証です。使用したことによって発生した結果については一切の責任を負いません。
 
 ![Version](https://img.shields.io/badge/version-8.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
