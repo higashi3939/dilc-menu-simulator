@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DILC Menu Simulator v8</title>
+<title>DILC Menu Simulator v9</title>
 <style>
 :root {
   --bg:        #0d1117; --surface:  #161b22;
@@ -11,6 +11,7 @@
   --text:      #c9d1d9; --text-dim: #484f58; --text-muted:#8b949e;
   --accent:    #58a6ff;
   --mode-s:    #58a6ff; --mode-m:   #f0403a;
+  --cursor-text: #1ad6ff; /* 実機準拠のカーソル選択行テキスト色（シアン） */
   --font-mono:'Courier New',monospace;
   --font-ui:  'Segoe UI','Helvetica Neue',sans-serif;
   --scr-w:520px; --scr-h:346px;
@@ -120,9 +121,11 @@ header h1{font-family:var(--font-mono);font-size:13px;color:var(--accent);
   border-right:10px solid var(--tc,#58a6ff);}
 .mrow.dis{opacity:.35;pointer-events:none}
 .rl{flex:0 0 50%;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mrow.sel .rl{color:#fff}
+.mrow.sel .rl{color:var(--cursor-text)}
 .rv{flex:0 0 50%;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
 .lcd.mm .rv{color:var(--text)}
+/* 選択行はモード問わずシアン (.lcd.mm .rv より詳細度を高くするため .lcd を含める) */
+.lcd .mrow.sel .rv{color:var(--cursor-text)}
 
 /* Status bar */
 .stat-bar{height:26px;display:flex;align-items:center;justify-content:space-between;
@@ -140,7 +143,7 @@ header h1{font-family:var(--font-mono);font-size:13px;color:var(--accent);
 .dopts{display:flex;flex-direction:column;gap:2px;margin-bottom:12px}
 .dopt{font-size:12px;padding:3px 8px;color:var(--text-muted);cursor:pointer;
   border-radius:1px;display:flex;align-items:center;gap:8px}
-.dopt.sel{background:rgba(255,255,255,.07);color:#fff}
+.dopt.sel{background:rgba(255,255,255,.07);color:var(--cursor-text)}
 .dbullet{color:var(--tc,#58a6ff);font-size:11px}
 .dbtns{display:flex;gap:8px;justify-content:flex-end}
 .dbtn{font-family:var(--font-mono);font-size:11px;padding:3px 12px;
@@ -238,7 +241,7 @@ textarea#ed.err{border-color:#d04040}
 
 <header>
   <h1>DILC Menu Simulator</h1>
-  <span class="badge bv">v8.0</span>
+  <span class="badge bv">v9.0</span>
   <span class="badge bf">📷/🎬 Stills · Movie</span>
   <!-- 言語切替 -->
   <div class="lang-toggle">
@@ -1238,8 +1241,8 @@ function renderItems() {
 
     /* 値：動画記録サイズ行はSVGアイコン3連、それ以外はテキスト */
     if(item.id==='m1_1' && item.mrData){
-      /* fps/圧縮方式アイコンは白固定。解像度アイコンも白に統一 (カーソル位置でも色を変えない) */
-      const iconColor = '#fff';
+      /* カーソル選択時はシアン (実機準拠)、非選択時は白 */
+      const iconColor = sel ? '#1ad6ff' : '#fff';
       const valWrap=document.createElement('div');
       valWrap.className='rv';
       valWrap.style.cssText='display:flex;align-items:center;gap:6px;';
@@ -1844,19 +1847,51 @@ function mrIconResSmall(id, c) {
   return `<svg viewBox="0 0 40 24" width="100%" height="24" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">${frame}${text}</svg>`;
 }
 /* ── SVGアイコン：fps（小・メニュー行用）
-       大サイズと同じ意匠 (白地黒文字ピル型)、viewBox 40×16 ── */
+       大サイズと同じ意匠 (白地黒文字ピル型)、viewBox 40×16
+       引数 c は「ピル地」の色 (通常時は #fff、カーソル選択時は --cursor-text)。
+       文字は実機準拠で常に黒。 ── */
 function mrIconFpsSmall(fps, c) {
   const p=fps.split('.'), intPart=p[0], frac=p[1]||'00';
   const label = `${intPart}.${frac}P`;
+  const pillFill = c || '#fff';
   return `<svg viewBox="0 0 40 16" width="100%" height="16" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
-    <rect x="0" y="0" width="40" height="16" rx="2" fill="#fff"/>
+    <rect x="0" y="0" width="40" height="16" rx="2" fill="${pillFill}"/>
     <text x="20" y="12" text-anchor="middle" font-size="10" font-weight="700" font-family="Arial,sans-serif" fill="#000">${label}</text>
   </svg>`;
 }
 /* ── SVGアイコン：圧縮方式（小・メニュー行用）
-       大サイズ (mrIconComp) と同じ意匠・同じ viewBox を使い、width=100% で縮小表示 ── */
+       大サイズ (mrIconComp) と同じ意匠だがメニュー行用に独立実装。
+       引数 c はラベル矩形の地色と修飾アイコン（↑↓/破線枠/塗り箱）の色に適用。
+       文字は実機準拠で常に黒。 ── */
 function mrIconCompSmall(iconId, c) {
-  return mrIconComp(iconId, c).replace('width="56" height="22"','width="100%" height="16" preserveAspectRatio="xMidYMid meet"');
+  const cfg = {
+    hi_intra:  { label:'Intra', mod:'up'   },
+    std_intra: { label:'Intra', mod:'none' },
+    lt_intra:  { label:'Intra', mod:'down' },
+    std_lgop:  { label:'LGOP',  mod:'none' },
+    lt_lgop:   { label:'LGOP',  mod:'down' },
+    raw_std:   { label:'RAW',   mod:'none' },
+    raw_lite:  { label:'RAW',   mod:'down' },
+  }[iconId] || { label:'?', mod:'none' };
+  const col = c || '#fff';
+
+  const labelX = cfg.mod==='none' ? 11 : 0;
+  const textX  = labelX + 17;
+  const labelRect = `<rect x="${labelX}" y="2" width="34" height="18" rx="1" fill="${col}"/>
+    <text x="${textX}" y="15.5" text-anchor="middle" font-size="10" font-weight="700" font-family="Arial,sans-serif" fill="#000">${cfg.label}</text>`;
+
+  let modifier = '';
+  if (cfg.mod === 'up') {
+    modifier = `
+      <rect x="38" y="13" width="16" height="7" fill="${col}"/>
+      <path d="M46 12 L46 4 M42 8 L46 4 L50 8" stroke="${col}" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  } else if (cfg.mod === 'down') {
+    modifier = `
+      <rect x="38" y="3" width="16" height="17" stroke="${col}" stroke-width="1" stroke-dasharray="1.5 1.2" fill="none"/>
+      <path d="M46 5 L46 12 M43 9.5 L46 12.5 L49 9.5" stroke="${col}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="41" y="14.5" width="10" height="5" fill="${col}"/>`;
+  }
+  return `<svg viewBox="0 0 56 22" width="100%" height="16" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">${labelRect}${modifier}</svg>`;
 }
 function getCompIconId(name) { return name||'std_intra'; }
 
@@ -2315,7 +2350,6 @@ function showTimelapsWizard() {
   ov.innerHTML=`
     <div style="flex-shrink:0;background:#030608;border-bottom:1px solid #0a1520;display:flex;align-items:center;justify-content:space-between;padding:4px 9px;">
       <span id="tlTitle" style="font-size:12px;font-weight:bold;color:#fff;letter-spacing:.06em;font-family:var(--font-mono);border-bottom:2px solid var(--tc,#d07020);padding-bottom:2px;">タイムラプス動画</span>
-      <span style="font-size:9px;color:#888;font-family:var(--font-mono)" id="tlSummary"></span>
     </div>
     <div id="tlMainArea" style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0;"></div>
     <div style="flex-shrink:0;background:#030608;border-top:1px solid #0a1520;display:flex;align-items:center;justify-content:space-between;padding:3px 9px;">
@@ -2376,12 +2410,13 @@ function tlRender() {
       background:${sel?'rgba(255,255,255,.06)':'transparent'};
       cursor:${dim?'default':'pointer'};flex-shrink:0;box-sizing:border-box;`;
     /* ラベル span */
-    const labelHtml = `<span style="flex:0 0 50%;font-size:13px;font-family:var(--font-mono);color:${dim?'#444':'#fff'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">`+
+    const labelHtml = `<span style="flex:0 0 50%;font-size:13px;font-family:var(--font-mono);color:${dim?'#444':sel?'var(--cursor-text)':'#fff'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">`+
       esc(lang==='ja'?row.ja:row.en)+
       `</span>`;
     if(row.key==='recsize' && row.mrData){
-      /* recsize 行は値部分をアイコン3連で表示（メイン側 m1_1 と同じ構造） */
-      const iconColor=dim?'#555':'#fff';
+      /* recsize 行は値部分をアイコン3連で表示（メイン側 m1_1 と同じ構造）
+         カーソル選択時はシアン (実機準拠)、非選択時は白、無効時は #555 */
+      const iconColor=dim?'#555':sel?'#1ad6ff':'#fff';
       el.innerHTML = labelHtml;
       const valWrap=document.createElement('div');
       valWrap.style.cssText='flex:0 0 50%;display:flex;align-items:center;gap:6px;overflow:hidden;';
@@ -2391,7 +2426,7 @@ function tlRender() {
       el.appendChild(valWrap);
     } else {
       el.innerHTML = labelHtml +
-        `<span style="flex:0 0 50%;font-size:13px;font-family:var(--font-mono);color:${dim?'#333':sel?'var(--tc,#d07020)':'#fff'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;">`+
+        `<span style="flex:0 0 50%;font-size:13px;font-family:var(--font-mono);color:${dim?'#333':sel?'var(--cursor-text)':'#fff'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;">`+
           esc(row.val)+
         `</span>`;
     }
@@ -2407,12 +2442,6 @@ function tlRender() {
   if(hintEl) hintEl.textContent = lang==='ja'
     ?'↑↓:選択  SET:編集  MENU:閉じる'
     :'↑↓:Select  SET:Edit  MENU:Close';
-
-  /* サマリー */
-  const sumEl=document.getElementById('tlSummary');
-  if(sumEl) sumEl.textContent = TLW.enabled
-    ? `${String(TLW.shots).padStart(4,'0')} shots`
-    : (lang==='ja'?'無効':'Disabled');
 }
 
 /* ── Interval 編集UI ── */
@@ -2521,9 +2550,10 @@ function tlRenderRecsizeEdit(area) {
       `border-left:10px solid ${sel?'var(--tc,#d07020)':'transparent'};`+
       `border-right:10px solid ${sel?'var(--tc,#d07020)':'transparent'};`+
       `background:${sel?'rgba(255,255,255,.06)':'transparent'};flex-shrink:0;box-sizing:border-box;`;
-    const r=document.createElement('div'); r.style.cssText='width:48px;flex-shrink:0;'; r.innerHTML=mrIconResSmall(rec.resId, '#fff');  el.appendChild(r);
-    const f=document.createElement('div'); f.style.cssText='width:48px;flex-shrink:0;'; f.innerHTML=mrIconFpsSmall(rec.fps, '#fff');    el.appendChild(f);
-    const c=document.createElement('div'); c.style.cssText='width:64px;flex-shrink:0;'; c.innerHTML=mrIconCompSmall(rec.compIconId, '#fff'); el.appendChild(c);
+    const iconColor = sel ? '#1ad6ff' : '#fff';
+    const r=document.createElement('div'); r.style.cssText='width:48px;flex-shrink:0;'; r.innerHTML=mrIconResSmall(rec.resId, iconColor);  el.appendChild(r);
+    const f=document.createElement('div'); f.style.cssText='width:48px;flex-shrink:0;'; f.innerHTML=mrIconFpsSmall(rec.fps, iconColor);    el.appendChild(f);
+    const c=document.createElement('div'); c.style.cssText='width:64px;flex-shrink:0;'; c.innerHTML=mrIconCompSmall(rec.compIconId, iconColor); el.appendChild(c);
     el.addEventListener('click',()=>{ TLW.editSelectIdx=i; tlRender(); });
     el.addEventListener('dblclick',()=>{ TLW.editSelectIdx=i; tlConfirmSelect(); });
     wrap.appendChild(el);
@@ -2564,7 +2594,7 @@ function tlRenderSelectEdit(area) {
       `background:${sel?'rgba(255,255,255,.06)':'transparent'};flex-shrink:0;box-sizing:border-box;`;
     el.innerHTML=
       `<span style="font-size:9px;color:${sel?'var(--tc,#d07020)':'#888'};font-family:var(--font-mono);">${sel?'●':'○'}</span>`+
-      `<span style="font-size:13px;color:#fff;font-family:var(--font-mono);">${esc(label)}</span>`;
+      `<span style="font-size:13px;color:${sel?'var(--cursor-text)':'#fff'};font-family:var(--font-mono);">${esc(label)}</span>`;
     el.addEventListener('click',()=>{ TLW.editSelectIdx=i; tlRender(); });
     el.addEventListener('dblclick',()=>{ TLW.editSelectIdx=i; tlConfirmSelect(); });
     wrap.appendChild(el);

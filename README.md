@@ -1,10 +1,11 @@
 # DILC Menu Simulator
 
-デジタル一眼カメラ（DILC: Digital Interchangeable-Lens Camera）の液晶メニュー画面をブラウザ上でシミュレーションするツールです。
+デジタル一眼カメラ（DILC: Digital Interchangeable-Lens Camera）の液晶メニュー画面をブラウザ上でシミュレーションするツールです。  
+UIプロトタイピングや仕様検討に使用することを目的にしています。
 
-本ツールおよびプログラムは無保証です。使用したことによって発生した結果については一切の責任を負いません。
+本ツールはジョークソフトです。
 
-![Version](https://img.shields.io/badge/version-8.0-blue)
+![Version](https://img.shields.io/badge/version-9.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
@@ -14,6 +15,7 @@
 - **単一HTMLファイル** — 外部依存なし。ダウンロードしてブラウザで開くだけで動作
 - **静止画 / 動画モード** — モード切替でタブ構成が完全に切り替わる
 - **実機準拠のタブアイコン** — 単色シルエットで実機の見た目を再現
+- **実機準拠のカーソル選択行** — カーソル行のテキスト・アイコンをシアン（`#1ad6ff`）で表示。動画記録サイズのアイコン3連も選択時は実機同様にシアン化
 - **日本語 / 英語 対応** — タブ名・項目名・選択肢すべてを即時切替
 - **実機準拠のメニュー定義** — リファレンス機種（Canon EOS R5 Mark II）の公式マニュアル（cam.start.canon）をもとにした全メニュー項目
 - **動画記録サイズウィザード** — 解像度・フレームレート・圧縮方式をアイコングリッドで設定
@@ -29,7 +31,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  DILC Menu Simulator  v8.0  📷/🎬 Stills·Movie         │
+│  DILC Menu Simulator  v9.0  📷/🎬 Stills·Movie         │
 ├──────────────┬──────────────────────┬───────────────────┤
 │  📷 静止画   │                      │  Navigation Log   │
 │  ┌─────────┐ │  Menu Definition     │  ─────────────── │
@@ -52,7 +54,7 @@
 
 ### 基本操作
 
-1. `menu-simulator-v8.html` をブラウザで開く
+1. `menu-simulator.html` をブラウザで開く
 2. 画面上部のモードスイッチで **📷 静止画** / **🎬 動画** を切替
 3. コントロールパッドまたはキーボードでメニューを操作
 
@@ -88,7 +90,7 @@
 
 ```
 .
-├── menu-simulator-v8.html   # シミュレーター本体（単一ファイル）
+├── menu-simulator.html      # シミュレーター本体（単一ファイル）
 ├── menu-simulator-spec.md   # 詳細仕様書
 └── README.md                # このファイル
 ```
@@ -197,7 +199,7 @@
 
 ```bash
 node -e "
-const fs=require('fs'),html=fs.readFileSync('menu-simulator-v8.html','utf8');
+const fs=require('fs'),html=fs.readFileSync('menu-simulator.html','utf8');
 const s=html.lastIndexOf('<script>'),e=html.lastIndexOf('</script>');
 fs.writeFileSync('/tmp/check.js',html.slice(s+8,e));
 " && node --check /tmp/check.js
@@ -217,6 +219,51 @@ fs.writeFileSync('/tmp/check.js',html.slice(s+8,e));
 ---
 
 ## 変更履歴
+
+### v9
+
+#### 実機準拠のカーソル選択行カラー（シアン）導入
+
+- CSS 変数 `--cursor-text: #1ad6ff` を新規定義。実機 Canon のカーソル選択色に準拠したシアンを一元管理
+- カーソル選択行のテキスト色を白からシアンに変更。適用範囲:
+  - メインメニュー行（ラベル `.mrow.sel .rl` + 値 `.mrow.sel .rv`）
+  - 選択肢ダイアログ (`.dopt.sel`)
+  - タイムラプスウィザードのメインリスト（ラベル + 値）
+  - タイムラプスウィザードの select 系編集 UI（タイムラプス撮影 / メイン記録形式 / 自動露出 / モニター自動消灯）のラベル
+- 動画モード時に `.lcd.mm .rv` が選択行の値色を上書きする問題に対応。選択行のセレクタを `.lcd .mrow.sel .rv` に変更し詳細度を 0,4,0 に引き上げ
+
+#### 動画記録サイズアイコン3連の選択時シアン化
+
+実機の動画記録サイズダイアログ表示に準拠し、カーソル行のアイコン3連を全てシアンに変更:
+
+- 解像度アイコン（フィルム枠）: 枠線・穴・テキストすべてシアン
+- fps アイコン（ピル型）: 地色がシアン、文字は実機通り黒のまま
+- 圧縮方式アイコン: ラベル地色 + 修飾アイコン（↑↓矢印 / 破線枠 / 塗り箱）がシアン、文字は黒
+
+##### 小サイズアイコン関数の改修
+
+- `mrIconFpsSmall(fps, c)`: 引数 `c` を受け取り、ピル地色に適用するよう実装変更（旧: `#fff` ハードコード）
+- `mrIconCompSmall(iconId, c)`: 大サイズ関数 `mrIconComp` のラッパーから独立実装に変更。ラベル地色と修飾アイコンの色に `c` を適用（文字は常に黒）
+- `mrIconResSmall(id, c)`: 既存実装で `c` 対応済み（変更なし）
+
+##### 適用箇所
+
+- メインメニュー `m1_1` の値表示: `iconColor = sel ? '#1ad6ff' : '#fff'`
+- タイムラプスの recsize 行: `iconColor = dim ? '#555' : sel ? '#1ad6ff' : '#fff'`
+- タイムラプスの recsize 編集 UI（6行リスト）: 選択行のアイコン3連をシアン化
+
+##### スコープ外（現状維持）
+
+- 動画記録サイズウィザード内のグリッド（解像度・fps・圧縮の選択画面）
+- 大サイズ関数 `mrIconRes` / `mrIconFps` / `mrIconComp` は引数 `c` を意図的に無視する設計を維持
+
+#### タイムラプスウィザードのヘッダーサマリー削除
+
+- ヘッダー右側に表示していた「○○○○ shots」/ 「無効」/ 「Disabled」表示を削除
+- `<span id="tlSummary">` 要素および `tlRender()` 内の書き込み処理を削除
+- ヘッダーは左端のタイトル（タイムラプス動画 / 現在の編集階層）のみのシンプルな表示に
+
+---
 
 ### v8
 
